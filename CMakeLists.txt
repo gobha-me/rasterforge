@@ -42,14 +42,21 @@ configure_file(${VERSION_HEADER_IN} ${VERSION_HEADER} @ONLY)
 # worth consuming.
 #
 # Declared here, above the dependency list, because that list is gated on them.
+option(${PROJECT_NAME}_BUILD_LIB "Build the RasterForge library" ON)
 option(${PROJECT_NAME}_BUILD_BIN "Build the executable in src/bin"    ${PROJECT_IS_TOP_LEVEL})
 option(${PROJECT_NAME}_TESTS     "Build and register the test suite"  ${PROJECT_IS_TOP_LEVEL})
 option(${PROJECT_NAME}_INSTALL   "Generate install / package-config rules" ${PROJECT_IS_TOP_LEVEL})
+option(${PROJECT_NAME}_FORCE_FETCH_DEPS
+  "Skip system packages and use RasterForge's pinned dependency fallbacks"
+  OFF
+)
 
 # Dependencies this project uses. Each name maps to cmake/deps/<name>.cmake
 # (find_package first, FetchContent fallback). This is the prune point for a new
 # project: drop a name to stop fetching that dep.
 set(${PROJECT_NAME}_DEPS
+  zlib    # Compression backend required by libpng
+  png     # Production PNG codec selected by ADR 0001
   catch2  # Catch2 v3 — test framework (test/)
 )
 
@@ -60,6 +67,10 @@ set(${PROJECT_NAME}_DEPS
 # The list above stays the single prune point — these lines only ever REMOVE
 # names from it, never add one. Removing a name that is already gone is a no-op,
 # so a project that prunes the list can leave these alone.
+if (NOT ${PROJECT_NAME}_BUILD_LIB)
+  list(REMOVE_ITEM ${PROJECT_NAME}_DEPS zlib png)
+endif ()
+
 if (NOT ${PROJECT_NAME}_TESTS)
   list(REMOVE_ITEM ${PROJECT_NAME}_DEPS catch2)
 endif ()
