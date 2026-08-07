@@ -7,11 +7,11 @@ media into predictable RGBA pixels. It owns decoding, resource limits, image
 fit, resize, and compositing; it deliberately does not own filesystems,
 networking, terminal protocols, or application presentation policy.
 
-The bootstrap release establishes the core contracts: checked image creation,
-tightly packed straight-alpha sRGBA pixels, owned images, borrowing views,
-structured errors, caller-controlled limits, and an installable CMake target.
-PNG/JPEG decoding and transforms are planned next; see [the design](docs/DESIGN.md)
-and the GitHub roadmap issues.
+The current release establishes checked image ownership and the codec-neutral
+decode boundary: tightly packed straight-alpha sRGBA pixels, borrowing views,
+structured errors, caller-controlled limits, bounded PNG signature detection,
+and an installable CMake target. Production PNG decoding, JPEG decoding, and
+transforms are tracked in the roadmap; see [the design](docs/DESIGN.md).
 
 ## Requirements
 
@@ -48,9 +48,18 @@ for packaging checks:
 ```cpp
 #include <rasterforge/rasterforge.hpp>
 
-auto image = rasterforge::Image::create({640, 480});
-if (!image) {
-  // image.error().code is stable program logic; message is diagnostic text.
+auto consume(std::span<const std::byte> encoded_bytes) -> void {
+  auto image = rasterforge::Image::create({640, 480});
+  if (!image) {
+    // image.error().code is stable program logic; message is diagnostic text.
+  }
+
+  auto decoded = rasterforge::decode(encoded_bytes);
+  if (!decoded) {
+    // RF-02b recognizes bounded PNG signatures. The production PNG adapter is
+    // the next roadmap item, so a complete PNG currently reports
+    // unsupported_feature after successful detection.
+  }
 }
 ```
 

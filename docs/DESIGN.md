@@ -123,9 +123,28 @@ struct Limits {
   std::uint32_t max_dimension{16'384};
 };
 
+enum class ImageFormat : std::uint8_t { png = 1 };
+enum class OrientationPolicy : std::uint8_t { apply, ignore };
+enum class OrientationStatus : std::uint8_t {
+  not_present,
+  applied,
+  ignored,
+};
+
 struct DecodeOptions {
   Limits limits{};
-  bool apply_orientation{true};
+  OrientationPolicy orientation{OrientationPolicy::apply};
+};
+
+class DecodedImage {
+ public:
+  [[nodiscard]] auto image() const noexcept -> const Image&;
+  [[nodiscard]] auto format() const noexcept -> ImageFormat;
+  [[nodiscard]] auto encoded_extent() const noexcept -> Extent;
+  [[nodiscard]] auto output_extent() const noexcept -> Extent;
+  [[nodiscard]] auto has_alpha() const noexcept -> bool;
+  [[nodiscard]] auto orientation_status() const noexcept
+      -> OrientationStatus;
 };
 
 [[nodiscard]] auto decode(std::span<const std::byte> encoded,

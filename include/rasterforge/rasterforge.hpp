@@ -64,6 +64,34 @@ struct Limits {
       -> bool = default;
 };
 
+// Format detection examines no more than this many leading encoded bytes.
+// Increasing the bound when another format is added is source-compatible, but
+// callers must not assume bytes beyond the current value are inspected.
+inline constexpr std::size_t decode_signature_prefix_bytes{8};
+
+enum class ImageFormat : std::uint8_t {
+  png = 1,
+};
+
+enum class OrientationPolicy : std::uint8_t {
+  apply = 0,
+  ignore = 1,
+};
+
+enum class OrientationStatus : std::uint8_t {
+  not_present = 0,
+  applied = 1,
+  ignored = 2,
+};
+
+struct DecodeOptions {
+  Limits limits{};
+  OrientationPolicy orientation{OrientationPolicy::apply};
+
+  friend constexpr auto operator==(const DecodeOptions &,
+                                   const DecodeOptions &) -> bool = default;
+};
+
 class Image;
 
 class ImageView {
@@ -155,5 +183,55 @@ private:
   std::size_t stride_bytes_{};
   std::vector<Rgba8> pixels_{};
 };
+
+namespace detail {
+
+struct DecodedImageAccess;
+
+} // namespace detail
+
+class DecodedImage {
+public:
+  DecodedImage(const DecodedImage &) = delete;
+  auto operator=(const DecodedImage &) -> DecodedImage & = delete;
+  DecodedImage(DecodedImage &&) noexcept = default;
+  auto operator=(DecodedImage &&) noexcept -> DecodedImage & = default;
+
+  [[nodiscard]] auto image() const noexcept -> const Image & { return image_; }
+  [[nodiscard]] auto view() const noexcept -> ImageView { return image_.view(); }
+  [[nodiscard]] auto format() const noexcept -> ImageFormat { return format_; }
+  [[nodiscard]] auto encoded_extent() const noexcept -> Extent {
+    return encoded_extent_;
+  }
+  [[nodiscard]] auto output_extent() const noexcept -> Extent {
+    return image_.extent();
+  }
+  [[nodiscard]] auto has_alpha() const noexcept -> bool { return has_alpha_; }
+  [[nodiscard]] auto orientation_status() const noexcept -> OrientationStatus {
+    return orientation_status_;
+  }
+
+private:
+  friend struct detail::DecodedImageAccess;
+
+  DecodedImage(Image image, ImageFormat format, Extent encoded_extent,
+               bool has_alpha, OrientationStatus orientation_status) noexcept
+      : image_{std::move(image)}, format_{format},
+        encoded_extent_{encoded_extent}, has_alpha_{has_alpha},
+        orientation_status_{orientation_status} {}
+
+  Image image_;
+  ImageFormat format_;
+  Extent encoded_extent_{};
+  bool has_alpha_{};
+  OrientationStatus orientation_status_{OrientationStatus::not_present};
+};
+
+// Decoding is byte-only: filenames, MIME hints, and filesystem access are not
+// part of this boundary. RF-02b recognizes the PNG signature and returns
+// unsupported_feature after detection; the production adapter lands in RF-02c.
+[[nodiscard]] auto decode(std::span<const std::byte> encoded,
+                          const DecodeOptions &options = {})
+    -> std::expected<DecodedImage, Error>;
 
 } // namespace rasterforge

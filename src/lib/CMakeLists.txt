@@ -1,6 +1,7 @@
 if (${PROJECT_NAME}_BUILD_LIB)
   add_library(${PROJECT_NAME}_lib STATIC
     codec_probe.cpp
+    decode.cpp
     image.cpp
   )
   add_library(${PROJECT_NAME}::lib ALIAS ${PROJECT_NAME}_lib)
