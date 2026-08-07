@@ -59,13 +59,16 @@ endif ()
 # install(EXPORT) cannot resolve it and this package is never produced at all.
 # See the install-visibility note in cmake/deps/catch2.cmake.
 #
-# This project's library links nothing. When yours does:
-#
-#   include(CMakeFindDependencyMacro)
-#   find_dependency(fmt 10 REQUIRED)
+# This project's library links libpng and zlib privately. Because it is a
+# static archive, both still occur in the exported link interface and must be
+# recreated before the Targets file is loaded.
 #
 # Use find_dependency, not find_package: it forwards REQUIRED/QUIET and reports
 # a miss as "package X not found because dependency Y was missing".
+
+include(CMakeFindDependencyMacro)
+find_dependency(ZLIB MODULE REQUIRED)
+find_dependency(PNG 1.6 MODULE REQUIRED)
 
 include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Targets.cmake")
 

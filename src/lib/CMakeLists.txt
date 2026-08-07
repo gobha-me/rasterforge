@@ -1,7 +1,6 @@
-option(${PROJECT_NAME}_BUILD_LIB "Build the RasterForge library" ON)
-
 if (${PROJECT_NAME}_BUILD_LIB)
   add_library(${PROJECT_NAME}_lib STATIC
+    codec_probe.cpp
     image.cpp
   )
   add_library(${PROJECT_NAME}::lib ALIAS ${PROJECT_NAME}_lib)
@@ -13,4 +12,9 @@ if (${PROJECT_NAME}_BUILD_LIB)
       $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
   )
   target_compile_features(${PROJECT_NAME}_lib PUBLIC cxx_std_23)
+  target_link_libraries(${PROJECT_NAME}_lib
+    PRIVATE
+      PNG::PNG
+      ZLIB::ZLIB
+  )
 endif ()

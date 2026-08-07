@@ -19,9 +19,10 @@ and the GitHub roadmap issues.
 - GCC 13+ or Clang 19+
 - A C++23 standard library with `std::expected`
 
-Catch2 is the only active dependency and is used only when building tests.
-CMake looks for a system package first and falls back to a pinned FetchContent
-checkout.
+The library links libpng and zlib privately; Catch2 is used only when building
+tests. CMake looks for system packages first and falls back to pinned
+FetchContent checkouts. Set `rasterforge_FORCE_FETCH_DEPS=ON` to exercise the
+pinned path explicitly.
 
 ## Build and test
 
