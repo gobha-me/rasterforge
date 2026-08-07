@@ -3,7 +3,9 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
+#include <span>
 
 #if __cpp_if_consteval < 202106L
 #error "RasterForge's C++23 usage requirement did not reach the consumer"
@@ -15,20 +17,34 @@ auto main() -> int {
     return 1;
   }
 
-  // Exercise the installed generic decode boundary without depending on a
-  // production codec: a matching one-byte PNG prefix is always truncated.
-  constexpr std::array encoded_prefix{std::byte{0x89}};
+  // A generated 1x1 16-bit grayscale PNG. Keeping it inline proves that every
+  // consumer mode links and runs the production codec without filesystem I/O.
+  constexpr std::array<std::uint8_t, 68> encoded_png{{
+      0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
+      0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+      0x10, 0x00, 0x00, 0x00, 0x00, 0x6A, 0xEE, 0x47, 0x16, 0x00, 0x00, 0x00,
+      0x0B, 0x49, 0x44, 0x41, 0x54, 0x78, 0xDA, 0x63, 0x10, 0x32, 0x01, 0x00,
+      0x00, 0x5B, 0x00, 0x47, 0x05, 0x5F, 0x6C, 0x82, 0x00, 0x00, 0x00, 0x00,
+      0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+  }};
   const rasterforge::DecodeOptions options{};
-  const auto decoded = rasterforge::decode(encoded_prefix, options);
-  if (decoded || decoded.error().code != rasterforge::ErrorCode::truncated_data) {
+  const auto decoded =
+      rasterforge::decode(std::as_bytes(std::span{encoded_png}), options);
+  if (!decoded || decoded->output_extent() != rasterforge::Extent{1, 1} ||
+      decoded->has_alpha()) {
     return 2;
   }
-  if (options.orientation != rasterforge::OrientationPolicy::apply) {
+  const auto decoded_row = decoded->view().row(0);
+  if (!decoded_row ||
+      (*decoded_row)[0] != rasterforge::Rgba8{0x12, 0x12, 0x12, 0xFF}) {
     return 3;
+  }
+  if (options.orientation != rasterforge::OrientationPolicy::apply) {
+    return 4;
   }
 
   std::printf("%.*s\n",
               static_cast<int>(rasterforge::version::program_name.size()),
               rasterforge::version::program_name.data());
-  return image->size_bytes() == sizeof(rasterforge::Rgba8) ? 0 : 4;
+  return image->size_bytes() == sizeof(rasterforge::Rgba8) ? 0 : 5;
 }

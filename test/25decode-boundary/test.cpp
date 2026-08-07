@@ -54,7 +54,7 @@ TEST_CASE("decode rejects empty and oversized inputs before detection",
 
     const auto decoded = rf::decode(png_signature, options);
     REQUIRE_FALSE(decoded);
-    REQUIRE(decoded.error().code == rf::ErrorCode::unsupported_feature);
+    REQUIRE(decoded.error().code == rf::ErrorCode::truncated_data);
   }
 
   SECTION("one byte beyond the input limit") {
@@ -95,7 +95,7 @@ TEST_CASE("decode detection is bounded to the documented signature prefix",
   SECTION("a complete recognized signature reaches the codec boundary") {
     const auto decoded = rf::decode(png_signature);
     REQUIRE_FALSE(decoded);
-    REQUIRE(decoded.error().code == rf::ErrorCode::unsupported_feature);
+    REQUIRE(decoded.error().code == rf::ErrorCode::truncated_data);
   }
 
   SECTION("bytes after the recognized prefix do not change detection") {
@@ -108,7 +108,7 @@ TEST_CASE("decode detection is bounded to the documented signature prefix",
 
     const auto decoded = rf::decode(encoded);
     REQUIRE_FALSE(decoded);
-    REQUIRE(decoded.error().code == rf::ErrorCode::unsupported_feature);
+    REQUIRE(decoded.error().code == rf::ErrorCode::truncated_data);
   }
 
   SECTION("a definite full-prefix mismatch is unsupported") {

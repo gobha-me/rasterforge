@@ -7,11 +7,11 @@ media into predictable RGBA pixels. It owns decoding, resource limits, image
 fit, resize, and compositing; it deliberately does not own filesystems,
 networking, terminal protocols, or application presentation policy.
 
-The current release establishes checked image ownership and the codec-neutral
-decode boundary: tightly packed straight-alpha sRGBA pixels, borrowing views,
-structured errors, caller-controlled limits, bounded PNG signature detection,
-and an installable CMake target. Production PNG decoding, JPEG decoding, and
-transforms are tracked in the roadmap; see [the design](docs/DESIGN.md).
+The current release decodes static PNG bytes into checked, tightly packed
+straight-alpha sRGBA images. It provides borrowing views, structured errors,
+caller-controlled limits, bounded signature detection, and an installable
+CMake target. JPEG decoding and transforms remain tracked in the roadmap; see
+[the design](docs/DESIGN.md).
 
 ## Requirements
 
@@ -49,19 +49,25 @@ for packaging checks:
 #include <rasterforge/rasterforge.hpp>
 
 auto consume(std::span<const std::byte> encoded_bytes) -> void {
-  auto image = rasterforge::Image::create({640, 480});
-  if (!image) {
-    // image.error().code is stable program logic; message is diagnostic text.
-  }
-
   auto decoded = rasterforge::decode(encoded_bytes);
   if (!decoded) {
-    // RF-02b recognizes bounded PNG signatures. The production PNG adapter is
-    // the next roadmap item, so a complete PNG currently reports
-    // unsupported_feature after successful detection.
+    // decoded.error().code is stable program logic; message is diagnostic text.
+    return;
   }
+
+  auto pixels = decoded->view();
+  // pixels is row-major, 8-bit, straight-alpha RGBA and borrows decoded.
 }
 ```
+
+| Format | Current behavior |
+| --- | --- |
+| PNG | Static RGB, RGBA, grayscale, palette/`tRNS`, 16-bit, and Adam7 decode |
+| JPEG, WebP | `unsupported_format`; tracked for later milestones |
+
+PNG samples are currently treated as sRGB without ICC/gamma conversion, and
+PNG EXIF orientation is not yet interpreted. These deliberate limitations are
+recorded in [ADR 0003](docs/adr/0003-png-decoder-normalization.md).
 
 Link the same target whether RasterForge is vendored, fetched, or installed:
 

@@ -1,5 +1,7 @@
 #include <rasterforge/rasterforge.hpp>
 
+#include "png_decoder.hpp"
+
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -29,10 +31,6 @@ constexpr Error truncated_signature{
 constexpr Error invalid_orientation{
     ErrorCode::invalid_argument,
     "decode orientation policy is not a recognized value"};
-constexpr Error decoder_unavailable{
-    ErrorCode::unsupported_feature,
-    "PNG was detected, but its decoder adapter is not implemented"};
-
 [[nodiscard]] constexpr auto valid(OrientationPolicy policy) noexcept -> bool {
   switch (policy) {
   case OrientationPolicy::apply:
@@ -43,6 +41,20 @@ constexpr Error decoder_unavailable{
 }
 
 } // namespace
+
+namespace detail {
+
+struct DecodedImageAccess {
+  [[nodiscard]] static auto create(Image image, ImageFormat format,
+                                   Extent encoded_extent, bool has_alpha,
+                                   OrientationStatus orientation_status)
+      -> DecodedImage {
+    return DecodedImage{std::move(image), format, encoded_extent, has_alpha,
+                        orientation_status};
+  }
+};
+
+} // namespace detail
 
 auto decode(std::span<const std::byte> encoded, const DecodeOptions &options)
     -> std::expected<DecodedImage, Error> {
@@ -66,7 +78,14 @@ auto decode(std::span<const std::byte> encoded, const DecodeOptions &options)
     return std::unexpected{truncated_signature};
   }
 
-  return std::unexpected{decoder_unavailable};
+  auto decoded = detail::decode_png(encoded, options);
+  if (!decoded) {
+    return std::unexpected{decoded.error()};
+  }
+
+  return detail::DecodedImageAccess::create(
+      std::move(decoded->image), ImageFormat::png, decoded->encoded_extent,
+      decoded->has_alpha, OrientationStatus::not_present);
 }
 
 } // namespace rasterforge
