@@ -69,6 +69,34 @@ PNG samples are currently treated as sRGB without ICC/gamma conversion, and
 PNG EXIF orientation is not yet interpreted. These deliberate limitations are
 recorded in [ADR 0003](docs/adr/0003-png-decoder-normalization.md).
 
+### Resource limits
+
+Every limit is inclusive: an input or decoded layout exactly at its configured
+limit is accepted. Callers can replace any default through `DecodeOptions`.
+
+| Limit | Default | Accounted resource |
+| --- | ---: | --- |
+| `max_input_bytes` | 32 MiB | Caller-owned encoded byte span |
+| `max_dimension` | 16,384 | Each encoded and orientation-normalized axis |
+| `max_pixels` | 64 Mi pixels | Pixels in the normalized output extent |
+| `max_output_bytes` | 256 MiB | Final tightly packed RGBA image storage |
+| `max_temporary_bytes` | 64 MiB | Cumulative codec allocation requests |
+
+The temporary budget excludes the input span and final image, which have their
+own limits. Successful codec allocation requests consume it for the rest of the
+decode even after memory is freed, bounding both temporary memory and allocation
+churn. Budget exhaustion is `resource_limit`; an allocator returning null within
+budget is `allocation_failure`.
+These accounting semantics are recorded in
+[ADR 0004](docs/adr/0004-decode-resource-accounting.md).
+
+```cpp
+rasterforge::DecodeOptions options{};
+options.limits.max_input_bytes = 4ULL * 1024ULL * 1024ULL;
+options.limits.max_temporary_bytes = 8ULL * 1024ULL * 1024ULL;
+auto decoded = rasterforge::decode(encoded_bytes, options);
+```
+
 Link the same target whether RasterForge is vendored, fetched, or installed:
 
 ```cmake

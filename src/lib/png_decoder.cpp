@@ -1,5 +1,7 @@
 #include "png_decoder.hpp"
 
+#include "decode_limits.hpp"
+
 #include <png.h>
 
 #include <algorithm>
@@ -20,6 +22,7 @@ enum class PngFailure : std::uint8_t {
   malformed,
   truncated,
   allocation,
+  resource_limit,
   unsupported,
   codec,
 };
@@ -27,6 +30,7 @@ enum class PngFailure : std::uint8_t {
 struct PngState {
   const std::byte *next{};
   std::size_t remaining{};
+  CodecAllocationBudget *allocations{};
   PngFailure failure{PngFailure::none};
 };
 
@@ -44,10 +48,9 @@ constexpr Error truncated_data{ErrorCode::truncated_data,
                                "PNG data ended before decoding completed"};
 constexpr Error allocation_failure{ErrorCode::allocation_failure,
                                    "PNG codec allocation failed"};
-constexpr Error invalid_dimensions{ErrorCode::invalid_dimensions,
-                                   "PNG dimensions must both be non-zero"};
-constexpr Error dimension_limit{ErrorCode::resource_limit,
-                                "PNG dimension exceeds the configured limit"};
+constexpr Error temporary_limit{
+    ErrorCode::resource_limit,
+    "PNG codec allocations exceed the configured temporary-byte limit"};
 constexpr Error unsupported_feature{
     ErrorCode::unsupported_feature,
     "PNG uses a critical feature that this decoder does not support"};
@@ -79,21 +82,32 @@ void png_warning_callback(png_structp, png_const_charp) noexcept {}
 [[nodiscard]] auto png_allocate(png_structp png,
                                 png_alloc_size_t byte_count) noexcept
     -> png_voidp {
-  if (std::cmp_greater(byte_count,
-                       static_cast<std::uintmax_t>(
-                           std::numeric_limits<std::size_t>::max()))) {
-    set_failure(state_from_memory(png), PngFailure::allocation);
+  auto *state = state_from_memory(png);
+  if (state == nullptr || state->allocations == nullptr) {
+    return nullptr;
+  }
+  if (std::cmp_greater(byte_count, std::numeric_limits<std::size_t>::max())) {
+    set_failure(state, PngFailure::resource_limit);
     return nullptr;
   }
 
-  auto *memory = std::malloc(static_cast<std::size_t>(byte_count));
+  auto *memory =
+      state->allocations->request(static_cast<std::size_t>(byte_count));
   if (memory == nullptr) {
-    set_failure(state_from_memory(png), PngFailure::allocation);
+    set_failure(state, state->allocations->failure() ==
+                               CodecAllocationFailure::resource_limit
+                           ? PngFailure::resource_limit
+                           : PngFailure::allocation);
   }
   return memory;
 }
 
-void png_deallocate(png_structp, png_voidp memory) noexcept {
+void png_deallocate(png_structp png, png_voidp memory) noexcept {
+  auto *state = state_from_memory(png);
+  if (state != nullptr && state->allocations != nullptr) {
+    state->allocations->release(memory);
+    return;
+  }
   std::free(memory);
 }
 
@@ -130,6 +144,8 @@ auto png_unknown_chunk_callback(png_structp png,
     return truncated_data;
   case PngFailure::allocation:
     return allocation_failure;
+  case PngFailure::resource_limit:
+    return temporary_limit;
   case PngFailure::unsupported:
     return unsupported_feature;
   case PngFailure::codec:
@@ -154,7 +170,7 @@ auto png_unknown_chunk_callback(png_structp png,
 
 [[nodiscard]] auto validate_ihdr(std::span<const std::byte> encoded,
                                  const Limits &limits)
-    -> std::expected<Extent, Error> {
+    -> std::expected<DecodeLayout, Error> {
   constexpr std::size_t ihdr_dimensions_end{24};
   if (encoded.size() < ihdr_dimensions_end) {
     return std::unexpected{truncated_data};
@@ -171,14 +187,7 @@ auto png_unknown_chunk_callback(png_structp png,
       read_big_endian_u32(encoded.data() + 16),
       read_big_endian_u32(encoded.data() + 20),
   };
-  if (extent.width == 0 || extent.height == 0) {
-    return std::unexpected{invalid_dimensions};
-  }
-  if (extent.width > limits.max_dimension ||
-      extent.height > limits.max_dimension) {
-    return std::unexpected{dimension_limit};
-  }
-  return extent;
+  return checked_decode_layout(extent, false, limits);
 }
 
 class PngReader {
@@ -227,10 +236,10 @@ private:
   png_set_user_limits(png, options->limits.max_dimension,
                       options->limits.max_dimension);
 
-  const auto chunk_limit = static_cast<png_alloc_size_t>(
-      std::min(options->limits.max_input_bytes,
-               static_cast<std::uint64_t>(
-                   std::numeric_limits<png_alloc_size_t>::max())));
+  const auto chunk_limit = static_cast<png_alloc_size_t>(std::min(
+      {options->limits.max_input_bytes, options->limits.max_temporary_bytes,
+       static_cast<std::uint64_t>(
+           std::numeric_limits<png_alloc_size_t>::max())}));
   png_set_chunk_malloc_max(png, chunk_limit);
   png_set_keep_unknown_chunks(png, PNG_HANDLE_CHUNK_IF_SAFE, nullptr, 0);
   png_set_read_user_chunk_fn(png, state, png_unknown_chunk_callback);
@@ -311,13 +320,21 @@ auto decode_png(std::span<const std::byte> encoded,
     return std::unexpected{expected_extent.error()};
   }
 
+  CodecAllocationBudget allocations{options.limits.max_temporary_bytes};
   PngState state{
       .next = encoded.data() + 8,
       .remaining = encoded.size() - 8,
+      .allocations = &allocations,
   };
   PngReader reader{&state};
   if (!reader.ready()) {
-    return std::unexpected{allocation_failure};
+    if (state.failure == PngFailure::none) {
+      set_failure(&state, allocations.failure() ==
+                                  CodecAllocationFailure::resource_limit
+                              ? PngFailure::resource_limit
+                              : PngFailure::allocation);
+    }
+    return std::unexpected{error_for(state.failure)};
   }
 
   PngHeader header{};
@@ -326,16 +343,19 @@ auto decode_png(std::span<const std::byte> encoded,
   }
 
   const Extent extent{header.width, header.height};
-  if (extent != *expected_extent) {
+  if (extent != expected_extent->encoded_extent) {
     return std::unexpected{codec_failure};
   }
-  auto image_result = Image::create(extent, options.limits);
+  auto image_result =
+      Image::create(expected_extent->output_extent, options.limits);
   if (!image_result) {
     return std::unexpected{image_result.error()};
   }
   auto image = std::move(*image_result);
 
-  if (std::cmp_not_equal(header.row_bytes, image.stride_bytes())) {
+  if (std::cmp_not_equal(header.row_bytes, expected_extent->row_bytes) ||
+      image.stride_bytes() != expected_extent->row_bytes ||
+      image.size_bytes() != expected_extent->output_bytes) {
     return std::unexpected{codec_failure};
   }
   auto first_row = image.mutable_view().row(0);
