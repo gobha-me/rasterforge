@@ -121,6 +121,7 @@ struct Limits {
   std::uint64_t max_pixels{64_MiPixels};
   std::uint64_t max_output_bytes{256_MiB};
   std::uint32_t max_dimension{16'384};
+  std::uint64_t max_temporary_bytes{64_MiB};
 };
 
 enum class ImageFormat : std::uint8_t { png = 1 };
@@ -233,7 +234,8 @@ Before allocating, validate with checked arithmetic:
 - `width * height` fits and is within the pixel limit;
 - `width * sizeof(Rgba8)` fits the stride type;
 - `stride * height` fits and is within the byte limit;
-- temporary buffers are included in the operation budget;
+- cumulative codec allocation requests are included in the temporary budget,
+  even when the codec frees and replaces a buffer during the operation;
 - orientation cannot swap dimensions past a limit;
 - a crafted header cannot trigger allocation before the full header is
   validated.

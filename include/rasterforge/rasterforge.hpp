@@ -59,6 +59,9 @@ struct Limits {
   std::uint64_t max_pixels{64ULL * 1024ULL * 1024ULL};
   std::uint64_t max_output_bytes{256ULL * 1024ULL * 1024ULL};
   std::uint32_t max_dimension{16'384U};
+  // Cumulative bytes requested by codec-owned temporary allocations. The
+  // encoded input span and the final Image storage have separate limits above.
+  std::uint64_t max_temporary_bytes{64ULL * 1024ULL * 1024ULL};
 
   friend constexpr auto operator==(const Limits &, const Limits &)
       -> bool = default;
