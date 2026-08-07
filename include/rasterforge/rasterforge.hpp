@@ -228,8 +228,8 @@ private:
 };
 
 // Decoding is byte-only: filenames, MIME hints, and filesystem access are not
-// part of this boundary. RF-02b recognizes the PNG signature and returns
-// unsupported_feature after detection; the production adapter lands in RF-02c.
+// part of this boundary. Recognized PNG data is normalized to straight-alpha
+// RGBA8; codec state and diagnostics remain private to the implementation.
 [[nodiscard]] auto decode(std::span<const std::byte> encoded,
                           const DecodeOptions &options = {})
     -> std::expected<DecodedImage, Error>;

@@ -3,6 +3,7 @@ if (${PROJECT_NAME}_BUILD_LIB)
     codec_probe.cpp
     decode.cpp
     image.cpp
+    png_decoder.cpp
   )
   add_library(${PROJECT_NAME}::lib ALIAS ${PROJECT_NAME}_lib)
 
