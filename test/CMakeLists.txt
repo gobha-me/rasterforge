@@ -9,23 +9,11 @@ add_test(
   COMMAND ${CMAKE_COMMAND} -P ${PROJECT_SOURCE_DIR}/cmake/version_selftest.cmake
 )
 
-# Leftover-template-artifact check (cmake/check_artifacts.cmake), also standalone.
-# The mode is keyed on NEW_PROJECT.md, whose last checklist step is "delete this
-# file": while it exists we are the template, so the Class-A rules are inverted
-# and assert each still MATCHES something (a rule that matches nothing has rotted
-# and would wave every fork through). Once a bootstrapped project deletes it, the
-# same script becomes a plain enforcement check with nothing to wire up.
-if (EXISTS ${PROJECT_SOURCE_DIR}/NEW_PROJECT.md)
-  add_test(
-    NAME artifact-check-selftest
-    COMMAND ${CMAKE_COMMAND} -DMODE=selftest -P ${PROJECT_SOURCE_DIR}/cmake/check_artifacts.cmake
-  )
-else ()
-  add_test(
-    NAME artifact-check
-    COMMAND ${CMAKE_COMMAND} -P ${PROJECT_SOURCE_DIR}/cmake/check_artifacts.cmake
-  )
-endif ()
+# Bootstrap-artifact and build-wiring check, run in enforcement mode.
+add_test(
+  NAME artifact-check
+  COMMAND ${CMAKE_COMMAND} -P ${PROJECT_SOURCE_DIR}/cmake/check_artifacts.cmake
+)
 
 file(GLOB TEST_DIRS ${CMAKE_CURRENT_LIST_DIR}/*)
 
@@ -60,10 +48,6 @@ foreach(TEST_DIR ${TEST_DIRS})
       ${SRCS}
     )
 
-    # Kept even though ${PROJECT_NAME}::lib already propagates include/ below:
-    # with -D<PROJECT>_BUILD_LIB=OFF there is no library to propagate anything,
-    # and every test still includes the generated <version.hpp> from there. The
-    # second path is a hook for shared test-only headers in test/include/.
     target_include_directories(${TEST_NAME}
       PUBLIC ${PROJECT_SOURCE_DIR}/include
       PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include
@@ -83,12 +67,6 @@ foreach(TEST_DIR ${TEST_DIRS})
     # target, and an unguarded link line would turn that supported configuration
     # into a hard configure error.
     #
-    # The ALIAS makes the STATIC/INTERFACE choice in src/lib/CMakeLists.txt
-    # invisible here — linking an ALIAS to an INTERFACE library propagates its
-    # usage requirements and archives nothing, so this line is correct for both.
-    #
-    # This lives in the elseif branch on purpose: a test dir with its own
-    # CMakeLists.txt owns all of its wiring, this included (see test/02example).
     if (TARGET ${PROJECT_NAME}::lib)
       target_link_libraries(${TEST_NAME}
         PRIVATE ${PROJECT_NAME}::lib
@@ -114,7 +92,7 @@ set_tests_properties(startup PROPERTIES FIXTURES_SETUP runners)
 set_tests_properties(shutdown PROPERTIES FIXTURES_CLEANUP runners)
 
 # The sanitizer smoke test (test/30sanitizer-smoke) deliberately trips the active
-# sanitizer to prove it is actually engaged (CT-03 — the whole point is to catch a
+# sanitizer to prove it is actually engaged (the whole point is to catch a
 # silently no-op sanitizer toolchain). ASan/TSan abort the process on the injected
 # bug, i.e. a NONZERO exit, which ctest would otherwise read as failure. So when
 # such a sanitizer is active we assert on its diagnostic instead: the test passes

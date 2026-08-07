@@ -1,10 +1,10 @@
 # Derive the project version from git tags — no commits needed just to roll a
 # version. This runs BEFORE project() in the root CMakeLists, so the VERSION_*
 # vars it sets are in scope for both project(VERSION ...) and the configure_file
-# that generates include/version.hpp.
+# that generates the build-tree rasterforge/version.hpp.
 #
 # The actual string parsing lives in version_parse.cmake (pure, no git) so it can
-# be unit-tested via `cmake -P cmake/version_selftest.cmake`. See CT-05 / #6.
+# be unit-tested via `cmake -P cmake/version_selftest.cmake`.
 
 include(${CMAKE_CURRENT_LIST_DIR}/version_parse.cmake)  # absolute: no CMAKE_MODULE_PATH here
 

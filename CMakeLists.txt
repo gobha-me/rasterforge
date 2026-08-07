@@ -13,12 +13,10 @@ endif()
 
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/version.cmake)
 
-# https://stackoverflow.com/questions/12344368/automatically-use-the-directory-as-the-project-name-in-cmake
-get_filename_component(ProjectId ${CMAKE_CURRENT_LIST_DIR} NAME)
-string(REPLACE " " "_" ProjectId ${ProjectId})
-
-project(${ProjectId}
+project(rasterforge
   VERSION ${VERSION}
+  DESCRIPTION "Safe in-memory raster decoding and pixel transforms"
+  HOMEPAGE_URL "https://github.com/gobha-me/rasterforge"
   LANGUAGES CXX
 )
 
@@ -29,13 +27,9 @@ include(GNUInstallDirs)
 # the *top-level* project's version, which is someone else's when we are consumed.
 message(STATUS "${PROJECT_NAME}:${PROJECT_VERSION} (tweak=${VERSION_TWEAK} dirty=${VERSION_DIRTY} top_level=${PROJECT_IS_TOP_LEVEL})")
 
-set (VERSION_HEADER_IN "${CMAKE_CURRENT_LIST_DIR}/include/version.hpp.in.cmake")
-
-if (EXISTS ${VERSION_HEADER_IN})
-  string (REPLACE ".hpp.in.cmake" ".hpp" VERSION_HEADER ${VERSION_HEADER_IN})
-  message(STATUS "${VERSION_HEADER_IN} ${VERSION_HEADER}")
-  configure_file (${VERSION_HEADER_IN} ${VERSION_HEADER})
-endif ()
+set(VERSION_HEADER_IN "${CMAKE_CURRENT_LIST_DIR}/include/rasterforge/version.hpp.in.cmake")
+set(VERSION_HEADER "${CMAKE_CURRENT_BINARY_DIR}/generated/rasterforge/version.hpp")
+configure_file(${VERSION_HEADER_IN} ${VERSION_HEADER} @ONLY)
 
 # ── What gets built ─────────────────────────────────────────────────────────
 # Everything except the library defaults to PROJECT_IS_TOP_LEVEL, so a project
@@ -56,24 +50,18 @@ option(${PROJECT_NAME}_INSTALL   "Generate install / package-config rules" ${PRO
 # (find_package first, FetchContent fallback). This is the prune point for a new
 # project: drop a name to stop fetching that dep.
 set(${PROJECT_NAME}_DEPS
-  catch2    # Catch2 v3 — test framework (test/)
-  fmtlib    # fmt        — formatting   (src/bin)
-  argparse  # argparse   — CLI parsing  (src/bin)
+  catch2  # Catch2 v3 — test framework (test/)
 )
 
 # Component gating: a dependency that exists only to serve a target we are not
 # building does not get fetched. Without this, consuming the library alone still
-# downloads a test framework and two application libraries.
+# downloads a test framework.
 #
 # The list above stays the single prune point — these lines only ever REMOVE
 # names from it, never add one. Removing a name that is already gone is a no-op,
 # so a project that prunes the list can leave these alone.
 if (NOT ${PROJECT_NAME}_TESTS)
   list(REMOVE_ITEM ${PROJECT_NAME}_DEPS catch2)
-endif ()
-
-if (NOT ${PROJECT_NAME}_BUILD_BIN)
-  list(REMOVE_ITEM ${PROJECT_NAME}_DEPS fmtlib argparse)
 endif ()
 
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/dependencies.cmake)

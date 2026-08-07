@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ── Consumer acceptance check (CT-04 / #5) ──────────────────────────────────
+# ── Consumer acceptance check ───────────────────────────────────────────────
 # Builds example/consumer/ against this project three ways — add_subdirectory,
 # FetchContent, and an installed find_package — and runs the result each time.
 #
@@ -35,7 +35,7 @@ run_mode() {
 
   if cmake -S "${CONSUMER_DIR}" -B "${build}" \
         -DCONSUMER_MODE="${mode}" \
-        -DTEMPLATE_PROJECT_NAME="${NAME}" \
+        -DRASTERFORGE_PROJECT_NAME="${NAME}" \
         "$@" > "${build}.log" 2>&1 \
      && cmake --build "${build}" --parallel >> "${build}.log" 2>&1
   then
@@ -60,7 +60,7 @@ run_mode() {
 }
 
 # ── Mode 1: add_subdirectory ────────────────────────────────────────────────
-run_mode add_subdirectory -DTEMPLATE_SOURCE_DIR="${REPO_ROOT}"
+run_mode add_subdirectory -DRASTERFORGE_SOURCE_DIR="${REPO_ROOT}"
 
 # ── Mode 2: FetchContent ────────────────────────────────────────────────────
 # A real consumer writes a public URL and a tag. We point at a throwaway repo
@@ -72,7 +72,7 @@ run_mode add_subdirectory -DTEMPLATE_SOURCE_DIR="${REPO_ROOT}"
 # failure that has nothing to do with your changes. That is not a caveat worth
 # documenting; it is a mode worth fixing.
 #
-# The snapshot has no tags, so the template falls back to version 0.0.0 with a
+# The snapshot has no tags, so RasterForge falls back to version 0.0.0 with a
 # reason — which incidentally exercises the tagless path for free.
 SNAPSHOT="${WORK}/snapshot"
 mkdir -p "${SNAPSHOT}"
@@ -88,8 +88,8 @@ mkdir -p "${SNAPSHOT}"
 ) > "${WORK}/snapshot.log" 2>&1
 
 run_mode fetchcontent \
-  -DTEMPLATE_GIT_REPOSITORY="file://${SNAPSHOT}" \
-  -DTEMPLATE_GIT_TAG="$(git -C "${SNAPSHOT}" rev-parse HEAD)"
+  -DRASTERFORGE_GIT_REPOSITORY="file://${SNAPSHOT}" \
+  -DRASTERFORGE_GIT_TAG="$(git -C "${SNAPSHOT}" rev-parse HEAD)"
 
 # ── Mode 3: installed find_package ──────────────────────────────────────────
 # Install the library only. The app and tests are off by their own options here,

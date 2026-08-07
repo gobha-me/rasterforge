@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.28)
 
 # ── A stand-in for a real public dependency ─────────────────────────────────
-# The smallest project that reproduces the shape which broke CT-15 (#29). Three
+# The smallest project that reproduces the missing-build-export-set failure. Three
 # properties are load-bearing; everything else is scaffolding:
 #
 #   1. It installs and exports — install(TARGETS ... EXPORT) + install(EXPORT).

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ── Public-dependency acceptance check (CT-15 / #29) ────────────────────────
+# ── Public-dependency acceptance check ──────────────────────────────────────
 # Proves that this project's install/export files can be copied verbatim into a
 # fork whose library links a FetchContent'd dependency into its own public
 # interface — and that the dependency's install rules follow that visibility
@@ -32,7 +32,7 @@
 #   N1  put export(EXPORT ...) back in cmake/install.cmake
 #         -> A, 'export called with target ... not in any export set'.
 #            F goes with it: restoring the export makes the build tree look
-#            like a package again.                       (this IS CT-15)
+#            like a package again.
 #   N2  skip the find_dependency patch below
 #         -> D only, 'referenced, but are missing'. A/B/E/F stay green.
 #   N3  change the recipe to set(PUBDEP_INSTALL OFF) unconditionally
@@ -84,7 +84,7 @@ die() { echo "HARNESS ERROR: $*" >&2; exit 2; }
 # appearing in it would quietly retire N1 while every assertion below still
 # reported green.
 if grep -rn '^[[:space:]]*export[[:space:]]*(' "${HARNESS}/fixture"; then
-  die "the fixture registered a build export set; it then no longer reproduces #29"
+  die "the fixture registered a build export set; it no longer reproduces the guarded failure"
 fi
 
 # ── Patch helper ────────────────────────────────────────────────────────────
@@ -128,12 +128,8 @@ FIXTURE_SHA="$(git -C "${FIXTURE}" rev-parse HEAD)"
 # gives: fetching from REPO_ROOT would clone HEAD, so on a dirty tree this would
 # test something other than the change being made.
 #
-# The directory is named after this project, and that is load-bearing rather
-# than tidy: the project takes its name from its directory, so a snapshot in a
-# differently-named directory is a differently-named project — every
-# -D<NAME>_TESTS=OFF below would silently miss, and the consumer would look for
-# a package that does not exist. Same trap as FetchContent's <name>-src
-# checkout, which example/consumer/CMakeLists.txt pins SOURCE_DIR to avoid.
+# Keep the snapshot directory aligned with the repository name because the
+# harness derives option and package spellings from that name below.
 FORK="${WORK}/${NAME}"
 mkdir -p "${FORK}"
 (
@@ -179,7 +175,7 @@ find_dependency(pubdep)
 FORK_SHA="$(git -C "${FORK}" rev-parse HEAD)"
 
 # ── A. The fork configures ──────────────────────────────────────────────────
-# This is CT-15. Everything below only gets to run because this passed.
+# Everything below only gets to run because this passed.
 #
 # Library only: it keeps the harness offline (the other three dependencies are
 # gated on the components that are off) and it is the build a consumer performs.
@@ -194,7 +190,7 @@ if cmake -S "${FORK}" -B "${FORK_BUILD}" \
 then
   ok "A: a fork with a public FetchContent dependency configures"
 else
-  bad "A: the fork does not configure (#29 if the export set is the complaint)"
+  bad "A: the fork does not configure (inspect the export-set diagnostic)"
   tail -n 25 "${WORK}/A-configure.log" | sed 's/^/     | /'
 fi
 
@@ -244,7 +240,7 @@ fi
 CONSUMER="${FORK}/example/consumer"
 if cmake -S "${CONSUMER}" -B "${WORK}/consumer-fp" \
       -DCONSUMER_MODE=find_package \
-      -DTEMPLATE_PROJECT_NAME="${NAME}" \
+      -DRASTERFORGE_PROJECT_NAME="${NAME}" \
       -DCMAKE_PREFIX_PATH="${PREFIX}" > "${WORK}/D-consumer.log" 2>&1 \
    && cmake --build "${WORK}/consumer-fp" --parallel >> "${WORK}/D-consumer.log" 2>&1
 then
@@ -275,9 +271,9 @@ fi
 LEAK="${WORK}/leak"
 if cmake -S "${CONSUMER}" -B "${WORK}/consumer-as" \
       -DCONSUMER_MODE=fetchcontent \
-      -DTEMPLATE_PROJECT_NAME="${NAME}" \
-      -DTEMPLATE_GIT_REPOSITORY="file://${FORK}" \
-      -DTEMPLATE_GIT_TAG="${FORK_SHA}" \
+      -DRASTERFORGE_PROJECT_NAME="${NAME}" \
+      -DRASTERFORGE_GIT_REPOSITORY="file://${FORK}" \
+      -DRASTERFORGE_GIT_TAG="${FORK_SHA}" \
       -DCMAKE_INSTALL_PREFIX="${LEAK}" \
       -DPUBDEP_URI="file://${FIXTURE}" \
       -DPUBDEP_TAG="${FIXTURE_SHA}" > "${WORK}/E-leak.log" 2>&1 \
@@ -297,12 +293,12 @@ else
 fi
 
 # ── F. The build tree is not a half-working package ─────────────────────────
-# There is no build-tree export any more (that is the #29 fix), so a build
+# There is intentionally no build-tree export, so a build
 # directory on CMAKE_PREFIX_PATH must be refused with a message that says why —
 # not with 'include could not find requested file' from three files down.
 if cmake -S "${CONSUMER}" -B "${WORK}/consumer-bt" \
       -DCONSUMER_MODE=find_package \
-      -DTEMPLATE_PROJECT_NAME="${NAME}" \
+      -DRASTERFORGE_PROJECT_NAME="${NAME}" \
       -DCMAKE_PREFIX_PATH="${FORK_BUILD}" > "${WORK}/F-buildtree.log" 2>&1
 then
   bad "F: a build directory was accepted as an installed package"

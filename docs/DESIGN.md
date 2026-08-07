@@ -1,6 +1,6 @@
 # RasterForge design
 
-Status: proposed architecture for the first implementation
+Status: accepted bootstrap architecture; implementation is tracked on GitHub
 
 RasterForge is a small C++23 library for safely turning encoded raster media
 into predictable RGBA pixels, then fitting and compositing those pixels for a
@@ -21,9 +21,8 @@ Venice image bytes
        +-- unchanged PNG may bypass decoding ----------------> Kitty payload
 ```
 
-This repository was bootstrapped from `cpp-template` v0.0.16. The scaffold has
-not yet been customized; follow `NEW_PROJECT.md` before beginning the library
-implementation.
+The repository began from the organization's C++ starter and now carries its
+own metadata, public image contracts, tests, package export, and roadmap.
 
 ## Why this is a separate library
 
@@ -308,12 +307,12 @@ suite.
 
 ## Proposed milestones
 
-### RF-01: bootstrap and contracts
+### RF-01: bootstrap and contracts (complete)
 
-- Complete `NEW_PROJECT.md`; choose a real license and customize metadata.
-- Replace demo code with checked `Extent`, `Rgba8`, `Image`, and views.
-- Establish structured `Error` and `Limits` types.
-- Prove install/consumer builds on GCC and Clang.
+- BSD 3-Clause license and RasterForge metadata.
+- Checked `Extent`, `Rgba8`, `Image`, and borrowing views.
+- Structured `Error` and caller-controlled `Limits` types.
+- Install/consumer verification on GCC and Clang.
 
 ### RF-02: first decoder
 
@@ -356,4 +355,3 @@ Use short ADRs for these choices rather than burying them in code review:
 4. Resize filters and determinism promise.
 5. Exception policy, especially allocation failure.
 6. Whether the first release includes encoding or keeps it separate.
-

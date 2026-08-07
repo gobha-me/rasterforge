@@ -5,8 +5,7 @@
 # ends up executing.
 #
 # Nothing here spells the project name literally: @PROJECT_NAME@ is substituted
-# at configure time, and the project name comes from the directory name. A fork
-# copies this file verbatim.
+# at configure time from the root project declaration.
 
 # ── Refuse a config with no targets beside it ───────────────────────────────
 # The place this file is found without a Targets file beside it is a build
@@ -22,7 +21,7 @@
 # An install prefix can no longer reach this state. cmake/install.cmake installs
 # this file and the Targets file under one `if (TARGET ...)` guard, so a prefix
 # has both or neither; it used to install this one alone when the library was
-# disabled (#33). If you are looking at an install prefix and reading this
+# disabled. If you are looking at an install prefix and reading this
 # message, either that guard has been reverted or files have been deleted by
 # hand — hence the wording below, which points at the likely cause without
 # claiming to be exhaustive.

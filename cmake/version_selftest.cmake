@@ -5,7 +5,7 @@
 #
 # Exit status is the contract: any failed row -> message(FATAL_ERROR) -> non-zero
 # exit -> ctest fails (target `version-parse-selftest`). This is what makes the
-# version parsing enforceable in CI (CT-08 / #9).
+# version parsing enforceable in CI.
 #
 # Following this repo's testing philosophy (AGENTS.md): the failure matrix comes
 # first — malformed / non-tag / boundary inputs — and the plain happy-path tag is

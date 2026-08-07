@@ -14,9 +14,7 @@
 # defaults to PROJECT_IS_TOP_LEVEL: an embedded copy of this project must not
 # inject rules into its consumer's `cmake --install`.
 #
-# Nothing here names the project literally. The package name is the project
-# name, which is derived from the directory (see the root CMakeLists), so a fork
-# copies this file verbatim.
+# Nothing here names the project literally; it follows PROJECT_NAME.
 
 include(CMakePackageConfigHelpers)
 
@@ -51,7 +49,7 @@ if (TARGET ${PROJECT_NAME}_lib)
   # ── Why there is no export(EXPORT ...) here ───────────────────────────────
   # There used to be one, describing this same target set against the build tree
   # so a consumer could point CMAKE_PREFIX_PATH at a build directory. It was
-  # removed (#29), and it must not come back, because it cannot survive being
+  # removed from the starter, and it must not come back, because it cannot survive being
   # copied into a project whose library links a dependency it did not build.
   #
   # export() enforces the same "every referenced target must be in an export
@@ -97,23 +95,15 @@ if (TARGET ${PROJECT_NAME}_lib)
   # For developing two projects side by side, use add_subdirectory() — same
   # target spelling, no packaging involved, and example/consumer/ covers it.
 
-  # ── Headers ───────────────────────────────────────────────────────────────
-  # *.hpp only, which picks up the public header and the generated version
-  # header while leaving version.hpp.in.cmake behind (it does not end in .hpp).
-  #
-  # Installing the generated header is deliberate, not incidental: the
-  # header-only variant inlines lib.hpp's function bodies, and those read
-  # VERSION_MAJOR / PROGRAM_NAME from it — leave it out and that variant cannot
-  # be consumed at all.
-  #
-  # ⚠ The cost, which a real project should weigh: the generated header declares
-  # unprefixed globals (PROGRAM_NAME, VERSION_MAJOR, ...) and lands directly in
-  # the consumer's include path, where it can collide with theirs. A project that
-  # expects to be widely consumed should move its headers under
-  # include/<project>/ and generate the version header there too.
+  # Public headers keep their rasterforge/ prefix. The configured version header
+  # lives in the build tree, so install it explicitly beside the source headers.
   install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     FILES_MATCHING PATTERN "*.hpp"
+  )
+
+  install(FILES ${VERSION_HEADER}
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rasterforge
   )
 endif ()
 
@@ -136,7 +126,7 @@ endif ()
 # -D<project>_BUILD_LIB=OFF installed a Config + ConfigVersion pair beside no
 # Targets file at all. Every other library-shaped rule here, the headers
 # included, was already behind the guard; this was the one piece that was not
-# (#33).
+# in the starter's library-disabled path.
 #
 # The tempting reading is that leaving it installed is *helpful*: the guard at
 # the top of project-config.cmake.in reports <project>_FOUND FALSE with a

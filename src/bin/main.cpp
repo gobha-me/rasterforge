@@ -1,18 +1,19 @@
-#include <argparse/argparse.hpp>
-#include <cstdlib>
-#include <fmt/format.h>
-#include <version.hpp>
+#include <rasterforge/rasterforge.hpp>
+#include <rasterforge/version.hpp>
 
-auto main(int argc, char** argv) -> int {
-  argparse::ArgumentParser program(PROGRAM_NAME.data(), fmt::format("{}.{}.{}", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH));
+#include <cstdio>
+#include <string_view>
 
-  try {
-    program.parse_args(argc, argv);
-  } catch (const std::exception& err) {
-    std::cerr << err.what() << '\n';
-    std::cerr << program;
-    std::exit(EXIT_FAILURE);
+auto main(int argc, char **argv) -> int {
+  if (argc == 2 && std::string_view{argv[1]} == "--version") {
+    std::printf("%.*s %u.%u.%u\n",
+                static_cast<int>(rasterforge::version::program_name.size()),
+                rasterforge::version::program_name.data(),
+                rasterforge::version::major, rasterforge::version::minor,
+                rasterforge::version::patch);
+    return 0;
   }
 
-  return EXIT_SUCCESS;
+  std::puts("RasterForge is a library. Pass --version for build information.");
+  return argc == 1 ? 0 : 2;
 }

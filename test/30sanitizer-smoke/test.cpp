@@ -8,7 +8,7 @@
 //   * Clang and GCC 14+ expose __has_feature.
 //   * GCC (13+) additionally predefines __SANITIZE_ADDRESS__ / __SANITIZE_THREAD__.
 //   * GCC has NO standard UBSan predefine before __has_feature (GCC 14+), so on
-//     GCC <= 13 the UBSan branch relies on -DTEMPLATE_UBSAN from undefined.cmake.
+//     GCC <= 13 the UBSan branch relies on -DRASTERFORGE_UBSAN from undefined.cmake.
 // The buggy branch is compiled ONLY under the matching sanitizer, so a default
 // build runs a trivially-passing test and never executes UB.
 #if !defined(__has_feature)
@@ -21,7 +21,7 @@
 #if defined(__SANITIZE_THREAD__) || __has_feature(thread_sanitizer)
 #  define SMOKE_TSAN 1
 #endif
-#if __has_feature(undefined_behavior_sanitizer) || defined(TEMPLATE_UBSAN)
+#if __has_feature(undefined_behavior_sanitizer) || defined(RASTERFORGE_UBSAN)
 #  define SMOKE_UBSAN 1
 #endif
 

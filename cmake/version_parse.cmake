@@ -3,7 +3,7 @@
 # This file intentionally does NOT invoke git — it only turns a describe string
 # into semantic version components. Keeping it pure is what lets the parser be
 # unit-tested in isolation via `cmake -P cmake/version_selftest.cmake` (no real
-# repo, no tags, no build tree required — see CT-05 / #6). `version.cmake` is the
+# repo, no tags, no build tree required). `version.cmake` is the
 # thin wrapper that runs git and feeds the result in here.
 #
 # parse_git_describe(<describe-string> <out-prefix>)
