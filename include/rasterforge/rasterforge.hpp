@@ -255,4 +255,13 @@ private:
                           const DecodeOptions &options = {})
     -> std::expected<DecodedImage, Error>;
 
+// Produce the exact destination extent with deterministic nearest-neighbor
+// sampling. Pixels outside the fitted destination rectangle are initialized to
+// matte. Destination storage is checked against limits before any sampling.
+[[nodiscard]] auto fit(ImageView source, Extent destination, Fit policy,
+                       FocalPoint focus = {},
+                       Rgba8 matte = Rgba8{0, 0, 0, 0},
+                       const Limits &limits = {})
+    -> std::expected<Image, Error>;
+
 } // namespace rasterforge
