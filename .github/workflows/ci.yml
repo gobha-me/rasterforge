@@ -76,6 +76,48 @@ jobs:
         # enforcement, and version parser self-test.
         run: ctest --test-dir build --output-on-failure
 
+  fuzz:
+    name: clang / fuzz smoke
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Clang
+        env:
+          CLANG_VERSION: "20"
+        run: |
+          wget -qO /tmp/llvm.sh https://apt.llvm.org/llvm.sh
+          chmod +x /tmp/llvm.sh
+          sudo /tmp/llvm.sh "$CLANG_VERSION"
+          sudo ln -sf "/usr/bin/clang-$CLANG_VERSION" /usr/local/bin/clang
+          sudo ln -sf "/usr/bin/clang++-$CLANG_VERSION" /usr/local/bin/clang++
+
+      - name: Verify checked-in corpus
+        run: python3 fuzz/generate_corpus.py --check
+
+      - name: Configure fuzz target
+        run: >
+          cmake -B build-fuzz
+          -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain/fuzz.cmake
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -Drasterforge_BUILD_BIN=OFF
+          -Drasterforge_TESTS=OFF
+          -Drasterforge_INSTALL=OFF
+          -Drasterforge_FUZZERS=ON
+
+      - name: Build fuzz target
+        run: cmake --build build-fuzz --target rasterforge-decode-fuzzer --parallel
+
+      - name: Run bounded decode fuzz smoke
+        run: |
+          mkdir -p build-fuzz/fuzz-artifacts
+          cmake -E copy_directory fuzz/corpus/decode build-fuzz/fuzz-corpus
+          build-fuzz/fuzz/rasterforge-decode-fuzzer build-fuzz/fuzz-corpus \
+            -runs=256 -max_len=4096 -timeout=2 -rss_limit_mb=512 \
+            -artifact_prefix=build-fuzz/fuzz-artifacts/
+
   # Prove the all-components-disabled shape configures and does not install a
   # stray package config. The CLI links the library, so it is disabled too.
   lib-off:
