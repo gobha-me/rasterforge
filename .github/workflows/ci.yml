@@ -183,6 +183,30 @@ jobs:
           CXX: ${{ matrix.cxx }}
         run: example/consumer/verify.sh
 
+  # Exercise both codec acquisition paths as library-only installed packages.
+  # The system row confirms no fallback was populated. The fetched row proves
+  # the pinned zlib/libpng install exports are resolved downstream.
+  codec-package:
+    name: codec package / ${{ matrix.source }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        source: [system, fetched]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure maintained system codec packages are present
+        if: ${{ matrix.source == 'system' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpng-dev zlib1g-dev
+
+      - name: Verify codec package path
+        run: example/consumer/verify-dependencies.sh ${{ matrix.source }}
+
   # The one path this project cannot exercise as itself: a fork whose library
   # links a FetchContent'd dependency into its own exported interface. Our
   # library links nothing, so the harness synthesises such a fork and asserts
@@ -214,3 +238,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run version_selftest.cmake
         run: cmake -P cmake/version_selftest.cmake
+      - name: Verify exported archive version
+        run: >
+          cmake
+          -DSOURCE_DIR="$PWD"
+          -DWORK_DIR="$PWD/build-version/version-archive-selftest"
+          -P cmake/version_archive_selftest.cmake

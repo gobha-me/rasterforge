@@ -1,12 +1,20 @@
 add_test(NAME startup COMMAND ${CMAKE_CURRENT_LIST_DIR}/../cmake/startup.sh)
 add_test(NAME shutdown COMMAND ${CMAKE_CURRENT_LIST_DIR}/../cmake/shutdown.sh)
 
-# Pure cmake -P unit test for the git-describe version parser (cmake/version_parse.cmake).
+# Pure cmake -P unit test for live and archived version parsing.
 # Registered standalone — it is a script, not a `<dir>-test` executable, so it must
 # not go through the auto-discovery foreach below. No fixtures: it has no runtime deps.
 add_test(
   NAME version-parse-selftest
   COMMAND ${CMAKE_COMMAND} -P ${PROJECT_SOURCE_DIR}/cmake/version_selftest.cmake
+)
+
+add_test(
+  NAME version-archive-selftest
+  COMMAND ${CMAKE_COMMAND}
+          -DSOURCE_DIR=${PROJECT_SOURCE_DIR}
+          -DWORK_DIR=${PROJECT_BINARY_DIR}/version-archive-selftest
+          -P ${PROJECT_SOURCE_DIR}/cmake/version_archive_selftest.cmake
 )
 
 # Bootstrap-artifact and build-wiring check, run in enforcement mode.

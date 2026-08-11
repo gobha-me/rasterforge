@@ -1,10 +1,10 @@
-# Pure, side-effect-free parsing of `git describe --tags --dirty` output.
+# Pure, side-effect-free parsing of live and archived `git describe` output.
 #
 # This file intentionally does NOT invoke git — it only turns a describe string
 # into semantic version components. Keeping it pure is what lets the parser be
 # unit-tested in isolation via `cmake -P cmake/version_selftest.cmake` (no real
 # repo, no tags, no build tree required). `version.cmake` is the
-# thin wrapper that runs git and feeds the result in here.
+# thin wrapper that reads the available metadata and feeds the result in here.
 #
 # parse_git_describe(<describe-string> <out-prefix>)
 #   Parses inputs of the shape  <tag>[-<N>-g<hash>][-dirty]  where <tag> is
@@ -70,4 +70,28 @@ function(parse_git_describe DESCRIBE OUT)
   set(${OUT}_TWEAK   "${_tweak}"   PARENT_SCOPE)
   set(${OUT}_DIRTY   "${_dirty}"   PARENT_SCOPE)
   set(${OUT}_MATCHED "${_matched}" PARENT_SCOPE)
+endfunction()
+
+# parse_git_archival(<archive-metadata> <out-prefix>)
+#   Extracts the describe-name field written by git archive's export-subst and
+#   applies the same strict parser used for live repository metadata. An absent,
+#   malformed, or unsubstituted field is a normal no-match rather than an error.
+function(parse_git_archival ARCHIVAL OUT)
+  set(_describe "")
+  string(REPLACE "\r\n" "\n" _normalized "${ARCHIVAL}")
+  string(REPLACE "\r" "\n" _normalized "${_normalized}")
+
+  if("${_normalized}" MATCHES "(^|\n)describe-name:[ \t]*([^\n]*)")
+    set(_describe "${CMAKE_MATCH_2}")
+    string(STRIP "${_describe}" _describe)
+  endif()
+
+  parse_git_describe("${_describe}" _archive)
+  set(${OUT}_DESCRIBE "${_describe}" PARENT_SCOPE)
+  set(${OUT}_MAJOR    "${_archive_MAJOR}" PARENT_SCOPE)
+  set(${OUT}_MINOR    "${_archive_MINOR}" PARENT_SCOPE)
+  set(${OUT}_PATCH    "${_archive_PATCH}" PARENT_SCOPE)
+  set(${OUT}_TWEAK    "${_archive_TWEAK}" PARENT_SCOPE)
+  set(${OUT}_DIRTY    "${_archive_DIRTY}" PARENT_SCOPE)
+  set(${OUT}_MATCHED  "${_archive_MATCHED}" PARENT_SCOPE)
 endfunction()

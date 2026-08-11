@@ -24,6 +24,11 @@ tests. CMake looks for system packages first and falls back to pinned
 FetchContent checkouts. Set `rasterforge_FORCE_FETCH_DEPS=ON` to exercise the
 pinned path explicitly.
 
+Release source archives retain their tag-derived version without requiring a
+Git checkout. An untagged source snapshot with neither repository nor archive
+metadata deliberately reports version `0.0.0` instead of borrowing tags from an
+unrelated enclosing repository.
+
 ## Build and test
 
 ```bash
@@ -72,6 +77,26 @@ auto consume(std::span<const std::byte> encoded_bytes) -> void {
 PNG samples are currently treated as sRGB without ICC/gamma conversion, and
 PNG EXIF orientation is not yet interpreted. These deliberate limitations are
 recorded in [ADR 0003](docs/adr/0003-png-decoder-normalization.md).
+
+### Error contract
+
+`Error::code` is stable program logic; `Error::message` is bounded diagnostic
+text and is not an API key. Public operations currently return these categories:
+
+| Code | Meaning |
+| --- | --- |
+| `empty_input` | The encoded byte span is empty. |
+| `input_too_large` | The encoded span exceeds `max_input_bytes`. |
+| `unsupported_format` | The bounded signature is not a supported format. |
+| `malformed_data` | Recognized input violates the format structure. |
+| `truncated_data` | Input ends within a recognized signature or required format data. |
+| `invalid_dimensions` | An image dimension is zero or otherwise invalid. |
+| `resource_limit` | A configured dimension, pixel, output, temporary, or representability bound was exceeded. |
+| `allocation_failure` | Allocation failed without first exhausting a caller limit. |
+| `unsupported_feature` | The format is recognized but uses an unsupported feature. |
+| `codec_failure` | The codec failed without a more specific stable classification. |
+| `invalid_argument` | A public option contains an unrecognized value. |
+| `row_out_of_range` | A requested image-view row is outside the image extent. |
 
 ### Resource limits
 
