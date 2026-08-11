@@ -3,6 +3,7 @@ if (${PROJECT_NAME}_BUILD_LIB)
     codec_probe.cpp
     decode.cpp
     decode_limits.cpp
+    fit.cpp
     fit_geometry.cpp
     image.cpp
     png_decoder.cpp

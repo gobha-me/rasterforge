@@ -153,7 +153,8 @@ class DecodedImage {
     -> std::expected<DecodedImage, Error>;
 
 [[nodiscard]] auto fit(ImageView source, Extent destination, Fit fit,
-                       FocalPoint focus = {}, Rgba8 matte = {0, 0, 0, 0})
+                       FocalPoint focus = {}, Rgba8 matte = {0, 0, 0, 0},
+                       const Limits& limits = {})
     -> std::expected<Image, Error>;
 
 }  // namespace rasterforge
@@ -197,10 +198,12 @@ The caller names an exact destination extent and a fit policy:
 - `stretch`: fill exactly; aspect ratio may change.
 - `none`: no scale; crop or letterbox around the focal point.
 
-Nearest-neighbor and a quality filter should be explicit choices. Filtering
-transparent pixels as straight RGBA creates dark or colored fringes, so resize
-in premultiplied alpha. If sRGB/linear conversion is deferred for v0.1, name
-and test that limitation.
+The initial `fit` operation uses deterministic nearest-neighbor sampling. It
+copies one complete straight-alpha RGBA source pixel per output pixel and does
+not mix samples, so transparent colored pixels are preserved without a
+premultiplied conversion. A later quality filter must be an explicit choice and
+must mix samples in a named premultiplied representation to avoid dark or
+colored fringes.
 
 Fit geometry uses half-open integer pixel rectangles. Finite focal coordinates
 are clamped independently to `[0, 1]`: zero selects the top or left endpoint,
@@ -211,6 +214,14 @@ infinite focal coordinates are invalid arguments. Aspect comparisons and ratio
 calculations use checked-width integer intermediates and geometry planning does
 not allocate pixel storage. The contract and its discrete-pixel tradeoff are
 recorded in [ADR 0005](adr/0005-fit-geometry.md).
+
+Nearest sampling maps destination pixel centers into the planned source
+rectangle using checked integer arithmetic. Exact half-pixel ties select the
+source pixel toward the right or bottom. The full destination is allocated
+through `Image::create` with the caller's limits and initialized to the exact
+matte value before sampling, so failures never expose partial output. The
+sampling and resource contract is recorded in
+[ADR 0006](adr/0006-nearest-fit-sampling.md).
 
 ### Background transforms
 
@@ -354,7 +365,7 @@ suite.
 ### RF-03: fit pipeline
 
 - Crop, contain, cover, stretch, letterbox, and focal point.
-- Add alpha-correct nearest and quality filtering.
+- Add byte-preserving nearest and alpha-correct quality filtering.
 - Test arithmetic boundaries and transparent-edge behavior.
 
 ### RF-04: format coverage and orientation

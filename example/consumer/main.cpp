@@ -43,8 +43,24 @@ auto main() -> int {
     return 4;
   }
 
+  rasterforge::Limits fit_limits{};
+  fit_limits.max_dimension = 2;
+  fit_limits.max_pixels = 4;
+  fit_limits.max_output_bytes = 4 * sizeof(rasterforge::Rgba8);
+  const auto fitted = rasterforge::fit(
+      decoded->view(), {2, 2}, rasterforge::Fit::contain, {},
+      rasterforge::Rgba8{0, 0, 0, 0}, fit_limits);
+  if (!fitted || fitted->extent() != rasterforge::Extent{2, 2}) {
+    return 5;
+  }
+  const auto fitted_row = fitted->view().row(1);
+  if (!fitted_row ||
+      (*fitted_row)[1] != rasterforge::Rgba8{0x12, 0x12, 0x12, 0xFF}) {
+    return 6;
+  }
+
   std::printf("%.*s\n",
               static_cast<int>(rasterforge::version::program_name.size()),
               rasterforge::version::program_name.data());
-  return image->size_bytes() == sizeof(rasterforge::Rgba8) ? 0 : 5;
+  return image->size_bytes() == sizeof(rasterforge::Rgba8) ? 0 : 7;
 }

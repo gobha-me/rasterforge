@@ -8,10 +8,11 @@ fit, resize, and compositing; it deliberately does not own filesystems,
 networking, terminal protocols, or application presentation policy.
 
 The current release decodes static PNG bytes into checked, tightly packed
-straight-alpha sRGBA images. It provides borrowing views, structured errors,
-caller-controlled limits, bounded signature detection, and an installable
-CMake target. JPEG decoding and transforms remain tracked in the roadmap; see
-[the design](docs/DESIGN.md).
+straight-alpha sRGBA images and fits image views to exact extents with
+deterministic nearest-neighbor sampling. It provides borrowing views,
+structured errors, caller-controlled limits, bounded signature detection, and
+an installable CMake target. JPEG decoding and quality filtering remain tracked
+in the roadmap; see [the design](docs/DESIGN.md).
 
 ## Requirements
 
@@ -66,8 +67,22 @@ auto consume(std::span<const std::byte> encoded_bytes) -> void {
 
   auto pixels = decoded->view();
   // pixels is row-major, 8-bit, straight-alpha RGBA and borrows decoded.
+
+  auto fitted = rasterforge::fit(pixels, {640, 480},
+                                 rasterforge::Fit::contain,
+                                 {}, {0, 0, 0, 0});
+  if (!fitted) {
+    return;
+  }
 }
 ```
+
+`fit` supports contain, cover, stretch, and no-scale policies. It allocates the
+exact destination through `Image::create`, fills uncovered pixels with the
+caller matte, and samples at pixel centers with exact ties toward the right or
+bottom. Nearest sampling copies complete RGBA bytes, including RGB values in
+fully transparent pixels. See [ADR 0006](docs/adr/0006-nearest-fit-sampling.md)
+for the deterministic sampling and limit contract.
 
 | Format | Current behavior |
 | --- | --- |
@@ -100,8 +115,9 @@ text and is not an API key. Public operations currently return these categories:
 
 ### Resource limits
 
-Every limit is inclusive: an input or decoded layout exactly at its configured
-limit is accepted. Callers can replace any default through `DecodeOptions`.
+Every limit is inclusive: an input, decoded layout, or fit destination exactly
+at its configured limit is accepted. Callers can replace defaults through
+`DecodeOptions`, `Image::create`, or `fit`.
 
 | Limit | Default | Accounted resource |
 | --- | ---: | --- |
