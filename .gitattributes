@@ -1,1 +1,2 @@
 fuzz/corpus/** binary
+.git_archival.txt export-subst

@@ -1,0 +1,3 @@
+# Substituted by git archive (including GitHub source archives) so builds that
+# intentionally contain no .git directory retain the release version.
+describe-name: $Format:%(describe:tags=true,match=v[0-9]*)$

@@ -71,6 +71,41 @@ expect("2.4.6"                         2   4   6   0   0   1)   # no prefix
 # --- happy path, last: a clean tag is tweak=0 dirty=0 (guards PARENT_SCOPE leaks) ---
 expect("v1.2.3"                        1   2   3   0   0   1)
 
+# expect_archive(<metadata> <describe> <major> <minor> <patch> <tweak> <matched>)
+function(expect_archive ARCHIVAL E_DESCRIBE E_MAJOR E_MINOR E_PATCH E_TWEAK
+         E_MATCHED)
+  parse_git_archival("${ARCHIVAL}" A)
+
+  set(_problems "")
+  foreach(_field IN ITEMS DESCRIBE MAJOR MINOR PATCH TWEAK MATCHED)
+    if(NOT A_${_field} STREQUAL E_${_field})
+      string(APPEND _problems " ${_field}=${A_${_field}}(want ${E_${_field}})")
+    endif()
+  endforeach()
+  if(NOT A_DIRTY STREQUAL "0")
+    string(APPEND _problems " DIRTY=${A_DIRTY}(want 0)")
+  endif()
+
+  if(_problems STREQUAL "")
+    message(STATUS
+      "ok   : archive '${A_DESCRIBE}' -> ${A_MAJOR}.${A_MINOR}.${A_PATCH} tweak=${A_TWEAK} matched=${A_MATCHED}")
+  else()
+    message(WARNING "FAIL : archive metadata ->${_problems}")
+    math(EXPR _fail_count "${_fail_count} + 1")
+    set(_fail_count "${_fail_count}" PARENT_SCOPE)
+  endif()
+endfunction()
+
+# Archive metadata has its own failure matrix. In particular, an ordinary
+# checkout contains the literal placeholder and must not mistake it for a tag.
+expect_archive(""                                      ""                0 0 0 0 0)
+expect_archive("node: abc123"                          ""                0 0 0 0 0)
+expect_archive("describe-name: "                       ""                0 0 0 0 0)
+expect_archive("describe-name: not-a-version"          "not-a-version"   0 0 0 0 0)
+expect_archive("describe-name: $Format:%(describe)$"   "$Format:%(describe)$" 0 0 0 0 0)
+expect_archive("node: abc123\ndescribe-name: v2.4.6\n" "v2.4.6"          2 4 6 0 1)
+expect_archive("describe-name: v2.4.6-7-gabc1234\n"    "v2.4.6-7-gabc1234" 2 4 6 7 1)
+
 if(_fail_count GREATER 0)
   message(FATAL_ERROR "version_parse self-test: ${_fail_count} case(s) failed")
 endif()
