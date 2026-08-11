@@ -212,7 +212,7 @@ jobs:
         if: ${{ matrix.source == 'system' }}
         run: |
           sudo apt-get update
-          sudo apt-get install -y libpng-dev zlib1g-dev
+          sudo apt-get install -y libpng-dev zlib1g-dev libjpeg-turbo8-dev
 
       - name: Verify codec package path
         run: example/consumer/verify-dependencies.sh ${{ matrix.source }}

@@ -14,13 +14,15 @@ that do not depend on a system libpng's private allocation sizes.
 
 ## Decision
 
-`Limits` adds `max_temporary_bytes`, defaulting to 64 MiB. It bounds cumulative
-bytes requested successfully by codec-owned allocations during one decode. The
-budget excludes the caller's encoded span and the final `Image`, which remain
-covered by `max_input_bytes` and `max_output_bytes`. Freed allocations do not
-replenish the budget, so repeated allocation churn cannot evade it; a zero-byte
-request accounts for one byte. Limits are inclusive and callers override them
-through `DecodeOptions`.
+`Limits` adds `max_temporary_bytes`, defaulting to 64 MiB. For the PNG adapter,
+it bounds cumulative bytes requested successfully by codec-owned allocations
+during one decode. The budget excludes the caller's encoded span and the final
+`Image`, which remain covered by `max_input_bytes` and `max_output_bytes`. Freed
+allocations do not replenish the budget, so repeated allocation churn cannot
+evade it; a zero-byte request accounts for one byte. Limits are inclusive and
+callers override them through `DecodeOptions`. Later codec-specific accounting
+must remain explicit; JPEG's reservation and in-memory ceiling are recorded in
+ADR 0008.
 
 A shared checked-layout operation validates non-zero encoded and normalized
 dimensions, orientation axis swaps, pixel count, row bytes, output bytes, and

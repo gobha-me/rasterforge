@@ -38,7 +38,10 @@ cmake -S "${REPO_ROOT}" -B "${BUILD}" \
   "-D${NAME}_FORCE_FETCH_DEPS=${FORCE_FETCH}"
 
 if [ "${MODE}" = system ]; then
-  for source_dir in "${BUILD}/_deps/zlib-src" "${BUILD}/_deps/libpng-src"; do
+  for source_dir in \
+    "${BUILD}/_deps/zlib-src" \
+    "${BUILD}/_deps/libpng-src" \
+    "${BUILD}/_deps/libjpeg_turbo-src"; do
     if [ -e "${source_dir}" ]; then
       echo "FAIL system: codec dependency was populated through FetchContent:" >&2
       echo "  ${source_dir}" >&2
@@ -46,7 +49,10 @@ if [ "${MODE}" = system ]; then
     fi
   done
 else
-  for source_dir in "${BUILD}/_deps/zlib-src" "${BUILD}/_deps/libpng-src"; do
+  for source_dir in \
+    "${BUILD}/_deps/zlib-src" \
+    "${BUILD}/_deps/libpng-src" \
+    "${BUILD}/_deps/libjpeg_turbo-src"; do
     if [ ! -d "${source_dir}" ]; then
       echo "FAIL fetched: expected FetchContent source is missing:" >&2
       echo "  ${source_dir}" >&2
@@ -59,7 +65,10 @@ cmake --build "${BUILD}" --parallel
 cmake --install "${BUILD}"
 
 if [ "${MODE}" = system ]; then
-  for unexpected in "${PREFIX}/include/png.h" "${PREFIX}/include/zlib.h"; do
+  for unexpected in \
+    "${PREFIX}/include/png.h" \
+    "${PREFIX}/include/zlib.h" \
+    "${PREFIX}/include/jpeglib.h"; do
     if [ -e "${unexpected}" ]; then
       echo "FAIL system: dependency leaked into RasterForge's prefix:" >&2
       echo "  ${unexpected}" >&2
@@ -67,7 +76,10 @@ if [ "${MODE}" = system ]; then
     fi
   done
 else
-  for expected in "${PREFIX}/include/png.h" "${PREFIX}/include/zlib.h"; do
+  for expected in \
+    "${PREFIX}/include/png.h" \
+    "${PREFIX}/include/zlib.h" \
+    "${PREFIX}/include/jpeglib.h"; do
     if [ ! -f "${expected}" ]; then
       echo "FAIL fetched: dependency install is incomplete: ${expected}" >&2
       exit 1
@@ -88,7 +100,7 @@ if [ "${GOT}" != "${NAME}" ]; then
 fi
 
 if [ "${MODE}" = fetched ]; then
-  for key in PNG_LIBRARY_RELEASE ZLIB_LIBRARY_RELEASE; do
+  for key in PNG_LIBRARY_RELEASE ZLIB_LIBRARY_RELEASE JPEGTurbo_LIBRARY; do
     value="$(sed -n "s|^${key}:[^=]*=||p" "${CONSUMER_BUILD}/CMakeCache.txt")"
     case "${value}" in
       "${PREFIX}"/*) ;;

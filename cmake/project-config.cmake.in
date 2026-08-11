@@ -69,6 +69,10 @@ endif ()
 include(CMakeFindDependencyMacro)
 find_dependency(ZLIB MODULE REQUIRED)
 find_dependency(PNG 1.6 MODULE REQUIRED)
+block()
+  list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}")
+  find_dependency(JPEGTurbo 2.1.5 MODULE REQUIRED)
+endblock()
 
 include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Targets.cmake")
 

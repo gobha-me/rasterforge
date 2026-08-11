@@ -105,6 +105,10 @@ if (TARGET ${PROJECT_NAME}_lib)
   install(FILES ${VERSION_HEADER}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rasterforge
   )
+
+  install(FILES ${PROJECT_SOURCE_DIR}/cmake/FindJPEGTurbo.cmake
+    DESTINATION ${_cfg_install_dir}
+  )
 endif ()
 
 # ── The application ─────────────────────────────────────────────────────────

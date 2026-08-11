@@ -125,7 +125,7 @@ struct Limits {
   std::uint64_t max_temporary_bytes{64_MiB};
 };
 
-enum class ImageFormat : std::uint8_t { png = 1 };
+enum class ImageFormat : std::uint8_t { png = 1, jpeg = 2 };
 enum class OrientationPolicy : std::uint8_t { apply, ignore };
 enum class OrientationStatus : std::uint8_t {
   not_present,

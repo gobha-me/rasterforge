@@ -7,12 +7,12 @@ media into predictable RGBA pixels. It owns decoding, resource limits, image
 fit, resize, and compositing; it deliberately does not own filesystems,
 networking, terminal protocols, or application presentation policy.
 
-The current release decodes static PNG bytes into checked, tightly packed
-straight-alpha sRGBA images and fits image views to exact extents with
+The current release decodes static PNG and JPEG bytes into checked, tightly
+packed straight-alpha sRGBA images and fits image views to exact extents with
 deterministic nearest-neighbor or alpha-correct triangle filtering. It provides
 borrowing views, structured errors, caller-controlled limits, bounded signature
-detection, and an installable CMake target. JPEG decoding remains tracked in the
-roadmap. See [the design](docs/DESIGN.md).
+detection, and an installable CMake target. See
+[the design](docs/DESIGN.md).
 
 ## Requirements
 
@@ -20,9 +20,9 @@ roadmap. See [the design](docs/DESIGN.md).
 - GCC 13+ or Clang 19+
 - A C++23 standard library with `std::expected`
 
-The library links libpng and zlib privately; Catch2 is used only when building
-tests. CMake looks for system packages first and falls back to pinned
-FetchContent checkouts. Set `rasterforge_FORCE_FETCH_DEPS=ON` to exercise the
+The library links libpng, zlib, and libjpeg-turbo privately; Catch2 is used only
+when building tests. CMake looks for system packages first and falls back to
+pinned source builds. Set `rasterforge_FORCE_FETCH_DEPS=ON` to exercise the
 pinned path explicitly.
 
 Release source archives retain their tag-derived version without requiring a
@@ -42,9 +42,10 @@ cmake --build build-clang --parallel
 ctest --test-dir build-clang --output-on-failure
 ```
 
-Clang/libFuzzer coverage for signature detection and PNG decoding is available
-as an explicit, bounded developer target. It is excluded from normal builds and
-CTest; see [the fuzzing guide](fuzz/README.md) for the corpus and smoke command.
+Clang/libFuzzer coverage for signature detection, PNG, and JPEG decoding is
+available as an explicit, bounded developer target. It is excluded from normal
+builds and CTest; see [the fuzzing guide](fuzz/README.md) for the corpus and
+smoke command.
 
 The `rasterforge` executable is intentionally small; it exposes build metadata
 for packaging checks:
@@ -95,11 +96,13 @@ allocated. See [ADR 0007](docs/adr/0007-scale-adaptive-triangle-filter.md).
 | Format | Current behavior |
 | --- | --- |
 | PNG | Static RGB, RGBA, grayscale, palette/`tRNS`, 16-bit, and Adam7 decode |
-| JPEG, WebP | `unsupported_format`; tracked for later milestones |
+| JPEG | Baseline/progressive 8-bit grayscale and RGB/YCbCr decode; opaque RGBA output |
+| WebP | `unsupported_format`; tracked for the v0.4 format milestone |
 
-PNG samples are currently treated as sRGB without ICC/gamma conversion, and
-PNG EXIF orientation is not yet interpreted. These deliberate limitations are
-recorded in [ADR 0003](docs/adr/0003-png-decoder-normalization.md).
+PNG and JPEG samples are currently treated as sRGB without profile conversion,
+and EXIF orientation is not yet interpreted. These deliberate limitations are
+recorded in [ADR 0003](docs/adr/0003-png-decoder-normalization.md) and
+[ADR 0008](docs/adr/0008-libjpeg-turbo-jpeg-decoding.md).
 
 ### Error contract
 
@@ -133,15 +136,16 @@ at its configured limit is accepted. Callers can replace defaults through
 | `max_dimension` | 16,384 | Each encoded and orientation-normalized axis |
 | `max_pixels` | 64 Mi pixels | Pixels in the normalized output extent |
 | `max_output_bytes` | 256 MiB | Final tightly packed RGBA image storage |
-| `max_temporary_bytes` | 64 MiB | Decode allocation requests or quality-filter coefficients |
+| `max_temporary_bytes` | 64 MiB | Codec working storage or quality-filter coefficients |
 
 The temporary budget excludes the input span and final image, which have their
-own limits. Successful codec allocation requests consume it for the rest of a
-decode even after memory is freed; quality fitting accounts the exact payload of
-its coefficient vectors. Budget exhaustion is `resource_limit`; an allocator
-returning null within budget is `allocation_failure`.
-These accounting semantics are recorded in
-[ADR 0004](docs/adr/0004-decode-resource-accounting.md).
+own limits. PNG accounts cumulative successful allocation requests; JPEG
+charges checked control/scanline work and caps progressive coefficient storage;
+quality fitting accounts the exact payload of its coefficient vectors. Budget
+exhaustion is `resource_limit`; an allocator returning null within budget is
+`allocation_failure`. These codec-specific semantics are recorded in
+[ADR 0004](docs/adr/0004-decode-resource-accounting.md) and
+[ADR 0008](docs/adr/0008-libjpeg-turbo-jpeg-decoding.md).
 
 ```cpp
 rasterforge::DecodeOptions options{};
@@ -176,7 +180,8 @@ installed under `lib/cmake/rasterforge/`.
   violations before allocation.
 - Public pixels are row-major 8-bit sRGBA with straight alpha.
 - Malformed data is returned as `std::expected` errors, never process aborts.
-- Keep codec state and dependencies behind the RasterForge boundary.
+- Keep codec state and libpng/libjpeg-turbo dependencies behind the RasterForge
+  boundary.
 - Write adversarial and boundary tests before happy-path smoke checks.
 - Preserve clean consumption through `add_subdirectory`, FetchContent, and
   installed `find_package` packages.
