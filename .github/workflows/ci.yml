@@ -107,16 +107,26 @@ jobs:
           -Drasterforge_INSTALL=OFF
           -Drasterforge_FUZZERS=ON
 
-      - name: Build fuzz target
-        run: cmake --build build-fuzz --target rasterforge-decode-fuzzer --parallel
+      - name: Build fuzz targets
+        run: >
+          cmake --build build-fuzz --parallel
+          --target rasterforge-decode-fuzzer rasterforge-fit-fuzzer
 
       - name: Run bounded decode fuzz smoke
         run: |
-          mkdir -p build-fuzz/fuzz-artifacts
-          cmake -E copy_directory fuzz/corpus/decode build-fuzz/fuzz-corpus
-          build-fuzz/fuzz/rasterforge-decode-fuzzer build-fuzz/fuzz-corpus \
+          mkdir -p build-fuzz/decode-artifacts
+          cmake -E copy_directory fuzz/corpus/decode build-fuzz/decode-corpus
+          build-fuzz/fuzz/rasterforge-decode-fuzzer build-fuzz/decode-corpus \
             -runs=256 -max_len=4096 -timeout=2 -rss_limit_mb=512 \
-            -artifact_prefix=build-fuzz/fuzz-artifacts/
+            -artifact_prefix=build-fuzz/decode-artifacts/
+
+      - name: Run bounded fit fuzz smoke
+        run: |
+          mkdir -p build-fuzz/fit-artifacts
+          cmake -E copy_directory fuzz/corpus/fit build-fuzz/fit-corpus
+          build-fuzz/fuzz/rasterforge-fit-fuzzer build-fuzz/fit-corpus \
+            -runs=512 -max_len=1024 -timeout=2 -rss_limit_mb=512 \
+            -artifact_prefix=build-fuzz/fit-artifacts/
 
   # Prove the all-components-disabled shape configures and does not install a
   # stray package config. The CLI links the library, so it is disabled too.

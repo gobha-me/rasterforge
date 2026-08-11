@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the checked-in decode corpus from the unit-test PNG fixtures."""
+"""Generate RasterForge's checked-in decode and fit fuzz corpora."""
 
 from __future__ import annotations
 
@@ -12,7 +12,9 @@ from pathlib import Path
 
 REPOSITORY = Path(__file__).resolve().parents[1]
 FIXTURES = REPOSITORY / "test" / "26png-decode" / "fixtures.hpp"
-CORPUS = Path(__file__).resolve().parent / "corpus" / "decode"
+CORPUS_ROOT = Path(__file__).resolve().parent / "corpus"
+DECODE_CORPUS = CORPUS_ROOT / "decode"
+FIT_CORPUS = CORPUS_ROOT / "fit"
 ARRAY = re.compile(
     r"constexpr\s+std::array<std::uint8_t,\s*\d+>\s+(\w+)\s*\{\{(.*?)\}\};",
     re.DOTALL,
@@ -42,7 +44,7 @@ def load_fixtures() -> dict[str, bytes]:
     return fixtures
 
 
-def expected_corpus() -> dict[str, bytes]:
+def expected_decode_corpus() -> dict[str, bytes]:
     fixtures = load_fixtures()
     signature = fixtures["rgb_png"][:8]
     rgb = fixtures["rgb_png"]
@@ -93,9 +95,33 @@ def expected_corpus() -> dict[str, bytes]:
     return seeds
 
 
-def check(seeds: dict[str, bytes]) -> int:
+def expected_fit_corpus() -> dict[str, bytes]:
+    # fit_fuzzer.cpp reads thirteen control bytes before optional RGBA samples:
+    # source/destination extents, policy, filter, two focal selectors, matte,
+    # and temporary-budget selector. These small seeds put every behavior class
+    # on the initial coverage frontier; libFuzzer supplies arbitrary pixel tails.
+    return {
+        "contain-nearest": bytes([4, 2, 5, 5, 0, 0, 2, 2, 9, 8, 7, 0, 3]),
+        "cover-triangle": bytes([5, 2, 2, 4, 1, 1, 3, 1, 6, 5, 4, 0, 3]),
+        "stretch-nearest": bytes([2, 5, 5, 2, 2, 0, 2, 2, 3, 2, 1, 0, 3]),
+        "none-triangle": bytes([5, 2, 3, 4, 3, 1, 1, 3, 12, 11, 10, 0, 3]),
+        "zero-source": bytes([0, 2, 3, 3, 0, 0, 2, 2, 0, 0, 0, 0, 3]),
+        "zero-destination": bytes([2, 2, 0, 3, 1, 1, 2, 2, 0, 0, 0, 0, 3]),
+        "nonfinite-focus": bytes([2, 2, 3, 3, 3, 0, 5, 6, 0, 0, 0, 0, 3]),
+        "clamped-focus": bytes([5, 2, 3, 4, 1, 1, 0, 4, 0, 0, 0, 0, 3]),
+        "tight-temporary": bytes([4, 4, 7, 7, 2, 1, 2, 2, 0, 0, 0, 0, 0]),
+        "destination-limit": bytes([2, 2, 24, 24, 2, 0, 2, 2, 0, 0, 0, 0, 3]),
+        "invalid-selectors": bytes([2, 2, 3, 3, 4, 2, 2, 2, 0, 0, 0, 0, 3]),
+        "arbitrary-pixels": bytes(
+            [2, 2, 3, 3, 0, 1, 2, 2, 90, 80, 70, 60, 3]
+            + list(range(16))
+        ),
+    }
+
+
+def check_corpus(corpus: Path, seeds: dict[str, bytes]) -> list[str]:
     actual_names = (
-        {path.name for path in CORPUS.iterdir()} if CORPUS.exists() else set()
+        {path.name for path in corpus.iterdir()} if corpus.exists() else set()
     )
     expected_names = set(seeds)
     errors: list[str] = []
@@ -104,23 +130,31 @@ def check(seeds: dict[str, bytes]) -> int:
     for extra in sorted(actual_names - expected_names):
         errors.append(f"unexpected {extra}")
     for name in sorted(expected_names & actual_names):
-        if (CORPUS / name).read_bytes() != seeds[name]:
+        if (corpus / name).read_bytes() != seeds[name]:
             errors.append(f"out of date {name}")
-    if errors:
-        print("decode corpus does not match its generator:", file=sys.stderr)
+    return errors
+
+
+def check(corpora: dict[str, tuple[Path, dict[str, bytes]]]) -> int:
+    failed = False
+    for label, (corpus, seeds) in corpora.items():
+        errors = check_corpus(corpus, seeds)
+        if not errors:
+            continue
+        failed = True
+        print(f"{label} corpus does not match its generator:", file=sys.stderr)
         for error in errors:
             print(f"  {error}", file=sys.stderr)
-        return 1
-    return 0
+    return int(failed)
 
 
-def write(seeds: dict[str, bytes]) -> None:
-    CORPUS.mkdir(parents=True, exist_ok=True)
-    for path in CORPUS.iterdir():
+def write_corpus(corpus: Path, seeds: dict[str, bytes]) -> None:
+    corpus.mkdir(parents=True, exist_ok=True)
+    for path in corpus.iterdir():
         if path.is_file() and path.name not in seeds:
             path.unlink()
     for name, contents in seeds.items():
-        path = CORPUS / name
+        path = corpus / name
         if not path.exists() or path.read_bytes() != contents:
             path.write_bytes(contents)
 
@@ -131,10 +165,14 @@ def main() -> int:
         "--check", action="store_true", help="verify without changing the corpus"
     )
     arguments = parser.parse_args()
-    seeds = expected_corpus()
+    corpora = {
+        "decode": (DECODE_CORPUS, expected_decode_corpus()),
+        "fit": (FIT_CORPUS, expected_fit_corpus()),
+    }
     if arguments.check:
-        return check(seeds)
-    write(seeds)
+        return check(corpora)
+    for corpus, seeds in corpora.values():
+        write_corpus(corpus, seeds)
     return 0
 
 
