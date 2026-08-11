@@ -202,6 +202,16 @@ transparent pixels as straight RGBA creates dark or colored fringes, so resize
 in premultiplied alpha. If sRGB/linear conversion is deferred for v0.1, name
 and test that limitation.
 
+Fit geometry uses half-open integer pixel rectangles. Finite focal coordinates
+are clamped independently to `[0, 1]`: zero selects the top or left endpoint,
+one selects the bottom or right endpoint, and the default `0.5` centers the
+available crop or matte slack. Derived dimensions and offsets round to the
+nearest integer, with exact halves placed toward the bottom or right. NaN and
+infinite focal coordinates are invalid arguments. Aspect comparisons and ratio
+calculations use checked-width integer intermediates and geometry planning does
+not allocate pixel storage. The contract and its discrete-pixel tradeoff are
+recorded in [ADR 0005](adr/0005-fit-geometry.md).
+
 ### Background transforms
 
 The first useful background operations are deliberately small:
