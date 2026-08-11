@@ -2,6 +2,8 @@
 
 #include <rasterforge/rasterforge.hpp>
 
+#include "fit_geometry.hpp"
+
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -62,5 +64,13 @@ struct QualityFilterPlan {
     std::size_t source_stride, std::span<std::uint8_t> destination,
     Extent destination_extent, std::size_t destination_stride,
     std::uint64_t max_temporary_bytes) -> std::expected<void, Error>;
+
+// Apply a precomputed plan to RGBA rectangles through the named premultiplied
+// sRGBA product representation. The plan must match the rectangle extents.
+// This executor allocates no storage and writes only the destination rectangle.
+[[nodiscard]] auto resize_quality_rgba(
+    ImageView source, Rect source_rect, MutableImageView destination,
+    Rect destination_rect, const QualityFilterPlan &plan)
+    -> std::expected<void, Error>;
 
 } // namespace rasterforge::detail

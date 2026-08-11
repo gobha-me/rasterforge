@@ -74,10 +74,10 @@ need the same media path. It must remain useful without either sister project.
 
 ## Public data model
 
-The public boundary uses 8-bit, row-major, straight-alpha sRGBA. Algorithms
-may convert to premultiplied linear values internally when filtering or
-compositing, but must not leak that representation through an ambiguously named
-type.
+The public boundary uses 8-bit, row-major, straight-alpha sRGBA. Algorithms may
+convert to explicitly named premultiplied representations internally when
+filtering or compositing, but must document their transfer function and must not
+leak that representation through an ambiguous type.
 
 An indicative API, not a frozen signature:
 
@@ -110,6 +110,7 @@ class Image {
 };
 
 enum class Fit { contain, cover, stretch, none };
+enum class ResizeFilter { nearest, triangle };
 
 struct FocalPoint {
   float x{0.5F};  // normalized and clamped to [0, 1]
@@ -154,7 +155,8 @@ class DecodedImage {
 
 [[nodiscard]] auto fit(ImageView source, Extent destination, Fit fit,
                        FocalPoint focus = {}, Rgba8 matte = {0, 0, 0, 0},
-                       const Limits& limits = {})
+                       const Limits& limits = {},
+                       ResizeFilter filter = ResizeFilter::nearest)
     -> std::expected<Image, Error>;
 
 }  // namespace rasterforge
@@ -198,14 +200,12 @@ The caller names an exact destination extent and a fit policy:
 - `stretch`: fill exactly; aspect ratio may change.
 - `none`: no scale; crop or letterbox around the focal point.
 
-The initial public `fit` operation uses deterministic nearest-neighbor
-sampling. It copies one complete straight-alpha RGBA source pixel per output
-pixel and does not mix samples, so transparent colored pixels are preserved
-without a premultiplied conversion. The internal quality-filter oracle is a
-separable, scale-adaptive triangle filter: it uses bilinear support while
-enlarging and widens its footprint to antialias reductions. Public quality
-selection remains deferred until the kernel mixes RGBA samples through a named
-premultiplied representation rather than straight alpha.
+The public `fit` operation defaults to deterministic nearest-neighbor sampling.
+It copies one complete straight-alpha RGBA source pixel per output pixel and
+does not mix samples, so transparent colored pixels are preserved without a
+premultiplied conversion. Callers may instead select a separable,
+scale-adaptive triangle filter: it uses bilinear support while enlarging and
+widens its footprint to antialias reductions.
 
 Fit geometry uses half-open integer pixel rectangles. Finite focal coordinates
 are clamped independently to `[0, 1]`: zero selects the top or left endpoint,
@@ -227,11 +227,15 @@ sampling and resource contract is recorded in
 
 Quality-filter coefficients use exact integer-rational weights, clamp support
 to the selected source rectangle, and normalize with half-up rounding after
-each separable pass. Coefficient storage is checked against the caller's
-temporary budget before allocation. RasterForge v0.3 deliberately chooses
-premultiplied gamma-encoded sRGB filtering rather than linear-light filtering;
-the determinism, edge, memory, color, and cancellation decisions are recorded
-in [ADR 0007](adr/0007-scale-adaptive-triangle-filter.md).
+each separable pass. RGB samples use exact 16-bit `channel * alpha` products,
+so nonzero-alpha straight colors survive the internal conversion without an
+8-bit premultiplication loss. The filtered result is unpremultiplied back to the
+public contract; alpha-zero output becomes transparent black. Coefficient
+storage is checked against the caller's temporary budget before output
+allocation. RasterForge v0.3 deliberately chooses premultiplied gamma-encoded
+sRGB filtering rather than linear-light filtering; the determinism, edge,
+memory, color, and cancellation decisions are recorded in
+[ADR 0007](adr/0007-scale-adaptive-triangle-filter.md).
 
 ### Background transforms
 

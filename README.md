@@ -9,11 +9,10 @@ networking, terminal protocols, or application presentation policy.
 
 The current release decodes static PNG bytes into checked, tightly packed
 straight-alpha sRGBA images and fits image views to exact extents with
-deterministic nearest-neighbor sampling. It provides borrowing views,
-structured errors, caller-controlled limits, bounded signature detection, and
-an installable CMake target. A deterministic scale-adaptive triangle oracle is
-available internally; public alpha-correct quality filtering and JPEG decoding
-remain tracked in the roadmap. See [the design](docs/DESIGN.md).
+deterministic nearest-neighbor or alpha-correct triangle filtering. It provides
+borrowing views, structured errors, caller-controlled limits, bounded signature
+detection, and an installable CMake target. JPEG decoding remains tracked in the
+roadmap. See [the design](docs/DESIGN.md).
 
 ## Requirements
 
@@ -71,7 +70,8 @@ auto consume(std::span<const std::byte> encoded_bytes) -> void {
 
   auto fitted = rasterforge::fit(pixels, {640, 480},
                                  rasterforge::Fit::contain,
-                                 {}, {0, 0, 0, 0});
+                                 {}, {0, 0, 0, 0}, {},
+                                 rasterforge::ResizeFilter::triangle);
   if (!fitted) {
     return;
   }
@@ -80,15 +80,17 @@ auto consume(std::span<const std::byte> encoded_bytes) -> void {
 
 `fit` supports contain, cover, stretch, and no-scale policies. It allocates the
 exact destination through `Image::create`, fills uncovered pixels with the
-caller matte, and samples at pixel centers with exact ties toward the right or
-bottom. Nearest sampling copies complete RGBA bytes, including RGB values in
-fully transparent pixels. See [ADR 0006](docs/adr/0006-nearest-fit-sampling.md)
-for the deterministic sampling and limit contract.
+caller matte, and samples at pixel centers. Nearest is the default and copies
+complete RGBA bytes, including RGB values in fully transparent pixels; see
+[ADR 0006](docs/adr/0006-nearest-fit-sampling.md).
 
-The internal quality-filter oracle uses exact integer-rational triangle weights
-with widened support for reductions. It is not exposed through `fit` until
-RF-03d integrates the kernel with a named premultiplied-alpha representation;
-see [ADR 0007](docs/adr/0007-scale-adaptive-triangle-filter.md).
+`ResizeFilter::triangle` uses exact integer-rational weights with widened
+support for reductions. It filters exact premultiplied sRGBA channel products,
+then returns straight-alpha pixels. This prevents colored transparent samples
+from creating fringes; a fully transparent filtered result is canonicalized to
+transparent black. Filtering remains gamma-encoded rather than linear-light.
+Coefficient storage is checked against `max_temporary_bytes` before output is
+allocated. See [ADR 0007](docs/adr/0007-scale-adaptive-triangle-filter.md).
 
 | Format | Current behavior |
 | --- | --- |
@@ -131,13 +133,13 @@ at its configured limit is accepted. Callers can replace defaults through
 | `max_dimension` | 16,384 | Each encoded and orientation-normalized axis |
 | `max_pixels` | 64 Mi pixels | Pixels in the normalized output extent |
 | `max_output_bytes` | 256 MiB | Final tightly packed RGBA image storage |
-| `max_temporary_bytes` | 64 MiB | Cumulative codec allocation requests |
+| `max_temporary_bytes` | 64 MiB | Decode allocation requests or quality-filter coefficients |
 
 The temporary budget excludes the input span and final image, which have their
-own limits. Successful codec allocation requests consume it for the rest of the
-decode even after memory is freed, bounding both temporary memory and allocation
-churn. Budget exhaustion is `resource_limit`; an allocator returning null within
-budget is `allocation_failure`.
+own limits. Successful codec allocation requests consume it for the rest of a
+decode even after memory is freed; quality fitting accounts the exact payload of
+its coefficient vectors. Budget exhaustion is `resource_limit`; an allocator
+returning null within budget is `allocation_failure`.
 These accounting semantics are recorded in
 [ADR 0004](docs/adr/0004-decode-resource-accounting.md).
 

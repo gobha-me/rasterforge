@@ -1,5 +1,7 @@
 #include "quality_filter.hpp"
 
+#include "premultiplied_rgba.hpp"
+
 #include <algorithm>
 #include <limits>
 #include <new>
@@ -266,11 +268,9 @@ struct AxisShape {
 
 [[nodiscard]] constexpr auto rounded_divide(UnsignedWide numerator,
                                             std::uint64_t denominator) noexcept
-    -> std::uint8_t {
-  const auto rounded =
-      (numerator + (static_cast<UnsignedWide>(denominator) / 2)) /
-      denominator;
-  return static_cast<std::uint8_t>(rounded);
+    -> UnsignedWide {
+  return (numerator + (static_cast<UnsignedWide>(denominator) / 2)) /
+         denominator;
 }
 
 [[nodiscard]] auto checked_storage_size(Extent extent, std::size_t stride)
@@ -415,8 +415,106 @@ auto resize_quality_scalar(std::span<const std::uint8_t> source,
           (static_cast<std::size_t>(destination_y) *
            destination_stride) +
           destination_x;
-      destination[destination_offset] =
-          rounded_divide(vertical_numerator, vertical_span.weight_sum);
+      destination[destination_offset] = static_cast<std::uint8_t>(
+          rounded_divide(vertical_numerator, vertical_span.weight_sum));
+    }
+  }
+  return {};
+}
+
+auto resize_quality_rgba(ImageView source, Rect source_rect,
+                         MutableImageView destination, Rect destination_rect,
+                         const QualityFilterPlan &plan)
+    -> std::expected<void, Error> {
+  const auto source_extent = source.extent();
+  const auto destination_extent = destination.extent();
+  const auto rect_fits = [](Rect rect, Extent extent) noexcept {
+    return rect.width != 0 && rect.height != 0 && rect.x <= extent.width &&
+           rect.y <= extent.height && rect.width <= extent.width - rect.x &&
+           rect.height <= extent.height - rect.y;
+  };
+  if (!rect_fits(source_rect, source_extent) ||
+      !rect_fits(destination_rect, destination_extent) ||
+      plan.horizontal.spans.size() != destination_rect.width ||
+      plan.vertical.spans.size() != destination_rect.height) {
+    return std::unexpected{invalid_storage};
+  }
+
+  for (std::uint32_t destination_y = 0;
+       destination_y < destination_rect.height; ++destination_y) {
+    const auto &vertical_span = plan.vertical.spans[destination_y];
+    auto destination_row = destination.row(destination_rect.y + destination_y);
+    if (!destination_row) {
+      return std::unexpected{destination_row.error()};
+    }
+
+    for (std::uint32_t destination_x = 0;
+         destination_x < destination_rect.width; ++destination_x) {
+      const auto &horizontal_span = plan.horizontal.spans[destination_x];
+      UnsignedWide vertical_red = 0;
+      UnsignedWide vertical_green = 0;
+      UnsignedWide vertical_blue = 0;
+      UnsignedWide vertical_alpha = 0;
+
+      for (std::size_t vertical_offset = 0;
+           vertical_offset < vertical_span.tap_count; ++vertical_offset) {
+        const auto &vertical_tap =
+            plan.vertical.taps[vertical_span.first_tap + vertical_offset];
+        const auto source_row =
+            source.row(source_rect.y + vertical_tap.source_index);
+        if (!source_row) {
+          return std::unexpected{source_row.error()};
+        }
+
+        UnsignedWide horizontal_red = 0;
+        UnsignedWide horizontal_green = 0;
+        UnsignedWide horizontal_blue = 0;
+        UnsignedWide horizontal_alpha = 0;
+        for (std::size_t horizontal_offset = 0;
+             horizontal_offset < horizontal_span.tap_count;
+             ++horizontal_offset) {
+          const auto &horizontal_tap = plan.horizontal.taps[
+              horizontal_span.first_tap + horizontal_offset];
+          const auto pixel = premultiply_srgba(
+              (*source_row)[source_rect.x + horizontal_tap.source_index]);
+          horizontal_red += static_cast<UnsignedWide>(pixel.red_times_alpha) *
+                            horizontal_tap.weight;
+          horizontal_green +=
+              static_cast<UnsignedWide>(pixel.green_times_alpha) *
+              horizontal_tap.weight;
+          horizontal_blue +=
+              static_cast<UnsignedWide>(pixel.blue_times_alpha) *
+              horizontal_tap.weight;
+          horizontal_alpha += static_cast<UnsignedWide>(pixel.alpha) *
+                              horizontal_tap.weight;
+        }
+
+        vertical_red +=
+            rounded_divide(horizontal_red, horizontal_span.weight_sum) *
+            vertical_tap.weight;
+        vertical_green +=
+            rounded_divide(horizontal_green, horizontal_span.weight_sum) *
+            vertical_tap.weight;
+        vertical_blue +=
+            rounded_divide(horizontal_blue, horizontal_span.weight_sum) *
+            vertical_tap.weight;
+        vertical_alpha +=
+            rounded_divide(horizontal_alpha, horizontal_span.weight_sum) *
+            vertical_tap.weight;
+      }
+
+      const PremultipliedSrgbaProduct filtered{
+          .red_times_alpha = static_cast<std::uint16_t>(
+              rounded_divide(vertical_red, vertical_span.weight_sum)),
+          .green_times_alpha = static_cast<std::uint16_t>(
+              rounded_divide(vertical_green, vertical_span.weight_sum)),
+          .blue_times_alpha = static_cast<std::uint16_t>(
+              rounded_divide(vertical_blue, vertical_span.weight_sum)),
+          .alpha = static_cast<std::uint8_t>(
+              rounded_divide(vertical_alpha, vertical_span.weight_sum)),
+      };
+      (*destination_row)[destination_rect.x + destination_x] =
+          unpremultiply_srgba(filtered);
     }
   }
   return {};

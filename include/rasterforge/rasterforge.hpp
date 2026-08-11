@@ -38,6 +38,11 @@ enum class Fit : std::uint8_t {
   none = 3,
 };
 
+enum class ResizeFilter : std::uint8_t {
+  nearest = 0,
+  triangle = 1,
+};
+
 // A normalized point used to place crops and matte regions. Finite values are
 // clamped to [0, 1] by fit operations; (0, 0) selects the top-left endpoint,
 // (1, 1) selects the bottom-right endpoint, and the default is centered.
@@ -77,8 +82,9 @@ struct Limits {
   std::uint64_t max_pixels{64ULL * 1024ULL * 1024ULL};
   std::uint64_t max_output_bytes{256ULL * 1024ULL * 1024ULL};
   std::uint32_t max_dimension{16'384U};
-  // Cumulative bytes requested by codec-owned temporary allocations. The
-  // encoded input span and the final Image storage have separate limits above.
+  // Operation-owned temporary storage, including cumulative codec allocation
+  // requests during decode and coefficient storage during quality fitting.
+  // The encoded input span and final Image storage have separate limits above.
   std::uint64_t max_temporary_bytes{64ULL * 1024ULL * 1024ULL};
 
   friend constexpr auto operator==(const Limits &, const Limits &)
@@ -255,13 +261,14 @@ private:
                           const DecodeOptions &options = {})
     -> std::expected<DecodedImage, Error>;
 
-// Produce the exact destination extent with deterministic nearest-neighbor
-// sampling. Pixels outside the fitted destination rectangle are initialized to
-// matte. Destination storage is checked against limits before any sampling.
+// Produce the exact destination extent with the selected deterministic filter.
+// Pixels outside the fitted destination rectangle are initialized to matte.
+// Destination and filter storage are checked against limits before sampling.
 [[nodiscard]] auto fit(ImageView source, Extent destination, Fit policy,
                        FocalPoint focus = {},
                        Rgba8 matte = Rgba8{0, 0, 0, 0},
-                       const Limits &limits = {})
+                       const Limits &limits = {},
+                       ResizeFilter filter = ResizeFilter::nearest)
     -> std::expected<Image, Error>;
 
 } // namespace rasterforge

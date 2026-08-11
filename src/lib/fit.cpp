@@ -1,9 +1,12 @@
 #include <rasterforge/rasterforge.hpp>
 
+#include "decode_limits.hpp"
 #include "fit_geometry.hpp"
+#include "quality_filter.hpp"
 
 #include <algorithm>
 #include <cstdint>
+#include <optional>
 
 namespace rasterforge {
 namespace {
@@ -33,11 +36,38 @@ namespace {
 } // namespace
 
 auto fit(ImageView source, Extent destination, Fit policy, FocalPoint focus,
-         Rgba8 matte, const Limits &limits) -> std::expected<Image, Error> {
+         Rgba8 matte, const Limits &limits, ResizeFilter filter)
+    -> std::expected<Image, Error> {
   const auto plan =
       detail::plan_fit(source.extent(), destination, policy, focus);
   if (!plan) {
     return std::unexpected{plan.error()};
+  }
+
+  const auto output_layout =
+      detail::checked_decode_layout(destination, false, limits);
+  if (!output_layout) {
+    return std::unexpected{output_layout.error()};
+  }
+
+  std::optional<detail::QualityFilterPlan> quality_plan;
+  switch (filter) {
+  case ResizeFilter::nearest:
+    break;
+  case ResizeFilter::triangle: {
+    auto result = detail::make_quality_filter_plan(
+        {plan->source.width, plan->source.height},
+        {plan->destination.width, plan->destination.height},
+        limits.max_temporary_bytes);
+    if (!result) {
+      return std::unexpected{result.error()};
+    }
+    quality_plan.emplace(std::move(*result));
+    break;
+  }
+  default:
+    return std::unexpected{
+        Error{ErrorCode::invalid_argument, "resize filter is not recognized"}};
   }
 
   auto output = Image::create(destination, limits);
@@ -52,6 +82,15 @@ auto fit(ImageView source, Extent destination, Fit policy, FocalPoint focus,
       return std::unexpected{row.error()};
     }
     std::ranges::fill(*row, matte);
+  }
+
+  if (quality_plan) {
+    const auto result = detail::resize_quality_rgba(
+        source, plan->source, output_view, plan->destination, *quality_plan);
+    if (!result) {
+      return std::unexpected{result.error()};
+    }
+    return output;
   }
 
   for (std::uint32_t destination_y = 0;

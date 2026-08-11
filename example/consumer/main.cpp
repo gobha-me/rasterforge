@@ -49,7 +49,8 @@ auto main() -> int {
   fit_limits.max_output_bytes = 4 * sizeof(rasterforge::Rgba8);
   const auto fitted = rasterforge::fit(
       decoded->view(), {2, 2}, rasterforge::Fit::contain, {},
-      rasterforge::Rgba8{0, 0, 0, 0}, fit_limits);
+      rasterforge::Rgba8{0, 0, 0, 0}, fit_limits,
+      rasterforge::ResizeFilter::triangle);
   if (!fitted || fitted->extent() != rasterforge::Extent{2, 2}) {
     return 5;
   }
