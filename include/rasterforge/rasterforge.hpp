@@ -31,6 +31,24 @@ struct Rgba8 {
 static_assert(sizeof(Rgba8) == 4,
               "RasterForge pixels must be tightly packed RGBA8");
 
+enum class Fit : std::uint8_t {
+  contain = 0,
+  cover = 1,
+  stretch = 2,
+  none = 3,
+};
+
+// A normalized point used to place crops and matte regions. Finite values are
+// clamped to [0, 1] by fit operations; (0, 0) selects the top-left endpoint,
+// (1, 1) selects the bottom-right endpoint, and the default is centered.
+struct FocalPoint {
+  float x{0.5F};
+  float y{0.5F};
+
+  friend constexpr auto operator==(const FocalPoint &, const FocalPoint &)
+      -> bool = default;
+};
+
 enum class ErrorCode {
   empty_input,
   input_too_large,
