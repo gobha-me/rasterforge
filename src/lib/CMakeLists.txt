@@ -7,6 +7,7 @@ if (${PROJECT_NAME}_BUILD_LIB)
     fit_geometry.cpp
     image.cpp
     png_decoder.cpp
+    quality_filter.cpp
   )
   add_library(${PROJECT_NAME}::lib ALIAS ${PROJECT_NAME}_lib)
 

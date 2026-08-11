@@ -198,12 +198,14 @@ The caller names an exact destination extent and a fit policy:
 - `stretch`: fill exactly; aspect ratio may change.
 - `none`: no scale; crop or letterbox around the focal point.
 
-The initial `fit` operation uses deterministic nearest-neighbor sampling. It
-copies one complete straight-alpha RGBA source pixel per output pixel and does
-not mix samples, so transparent colored pixels are preserved without a
-premultiplied conversion. A later quality filter must be an explicit choice and
-must mix samples in a named premultiplied representation to avoid dark or
-colored fringes.
+The initial public `fit` operation uses deterministic nearest-neighbor
+sampling. It copies one complete straight-alpha RGBA source pixel per output
+pixel and does not mix samples, so transparent colored pixels are preserved
+without a premultiplied conversion. The internal quality-filter oracle is a
+separable, scale-adaptive triangle filter: it uses bilinear support while
+enlarging and widens its footprint to antialias reductions. Public quality
+selection remains deferred until the kernel mixes RGBA samples through a named
+premultiplied representation rather than straight alpha.
 
 Fit geometry uses half-open integer pixel rectangles. Finite focal coordinates
 are clamped independently to `[0, 1]`: zero selects the top or left endpoint,
@@ -222,6 +224,14 @@ through `Image::create` with the caller's limits and initialized to the exact
 matte value before sampling, so failures never expose partial output. The
 sampling and resource contract is recorded in
 [ADR 0006](adr/0006-nearest-fit-sampling.md).
+
+Quality-filter coefficients use exact integer-rational weights, clamp support
+to the selected source rectangle, and normalize with half-up rounding after
+each separable pass. Coefficient storage is checked against the caller's
+temporary budget before allocation. RasterForge v0.3 deliberately chooses
+premultiplied gamma-encoded sRGB filtering rather than linear-light filtering;
+the determinism, edge, memory, color, and cancellation decisions are recorded
+in [ADR 0007](adr/0007-scale-adaptive-triangle-filter.md).
 
 ### Background transforms
 

@@ -11,8 +11,9 @@ The current release decodes static PNG bytes into checked, tightly packed
 straight-alpha sRGBA images and fits image views to exact extents with
 deterministic nearest-neighbor sampling. It provides borrowing views,
 structured errors, caller-controlled limits, bounded signature detection, and
-an installable CMake target. JPEG decoding and quality filtering remain tracked
-in the roadmap; see [the design](docs/DESIGN.md).
+an installable CMake target. A deterministic scale-adaptive triangle oracle is
+available internally; public alpha-correct quality filtering and JPEG decoding
+remain tracked in the roadmap. See [the design](docs/DESIGN.md).
 
 ## Requirements
 
@@ -83,6 +84,11 @@ caller matte, and samples at pixel centers with exact ties toward the right or
 bottom. Nearest sampling copies complete RGBA bytes, including RGB values in
 fully transparent pixels. See [ADR 0006](docs/adr/0006-nearest-fit-sampling.md)
 for the deterministic sampling and limit contract.
+
+The internal quality-filter oracle uses exact integer-rational triangle weights
+with widened support for reductions. It is not exposed through `fit` until
+RF-03d integrates the kernel with a named premultiplied-alpha representation;
+see [ADR 0007](docs/adr/0007-scale-adaptive-triangle-filter.md).
 
 | Format | Current behavior |
 | --- | --- |
