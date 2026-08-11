@@ -35,8 +35,8 @@ configure_file(${VERSION_HEADER_IN} ${VERSION_HEADER} @ONLY)
 # Everything except the library defaults to PROJECT_IS_TOP_LEVEL, so a project
 # that consumes this one via add_subdirectory() or FetchContent gets the library
 # and nothing else — no demo executable, no test suite, and no install rules
-# landing in someone else's `cmake --install`. Building this repo directly is
-# unchanged: all three are ON.
+# landing in someone else's `cmake --install`. Building this repo directly
+# keeps the developer components enabled.
 #
 # The library itself defaults ON in src/lib/CMakeLists.txt — it is the thing
 # worth consuming.
@@ -45,6 +45,7 @@ configure_file(${VERSION_HEADER_IN} ${VERSION_HEADER} @ONLY)
 option(${PROJECT_NAME}_BUILD_LIB "Build the RasterForge library" ON)
 option(${PROJECT_NAME}_BUILD_BIN "Build the executable in src/bin"    ${PROJECT_IS_TOP_LEVEL})
 option(${PROJECT_NAME}_TESTS     "Build and register the test suite"  ${PROJECT_IS_TOP_LEVEL})
+option(${PROJECT_NAME}_FUZZERS   "Build the Clang/libFuzzer targets"   ${PROJECT_IS_TOP_LEVEL})
 option(${PROJECT_NAME}_INSTALL   "Generate install / package-config rules" ${PROJECT_IS_TOP_LEVEL})
 option(${PROJECT_NAME}_FORCE_FETCH_DEPS
   "Skip system packages and use RasterForge's pinned dependency fallbacks"
@@ -89,6 +90,13 @@ if (${PROJECT_NAME}_TESTS)
 
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/test)
 endif (${PROJECT_NAME}_TESTS)
+
+# Fuzz targets are developer-only and EXCLUDE_FROM_ALL. The option follows the
+# same top-level default as tests, while consumers get neither targets nor
+# compiler instrumentation through add_subdirectory / FetchContent.
+if (${PROJECT_NAME}_FUZZERS)
+  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/fuzz)
+endif ()
 
 # Install rules, package config and the exported target set. Replaces the
 # long-standing "TODO Install Template": find_package(<project> CONFIG) is real

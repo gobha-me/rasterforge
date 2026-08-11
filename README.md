@@ -36,6 +36,10 @@ cmake --build build-clang --parallel
 ctest --test-dir build-clang --output-on-failure
 ```
 
+Clang/libFuzzer coverage for signature detection and PNG decoding is available
+as an explicit, bounded developer target. It is excluded from normal builds and
+CTest; see [the fuzzing guide](fuzz/README.md) for the corpus and smoke command.
+
 The `rasterforge` executable is intentionally small; it exposes build metadata
 for packaging checks:
 
