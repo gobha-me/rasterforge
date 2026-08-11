@@ -10,9 +10,10 @@ consuming projects because `rasterforge_FUZZERS` follows
 
 The `rasterforge-decode-fuzzer` target feeds arbitrary caller-owned byte spans
 through the public `decode()` boundary. Its deliberately small limits cap input
-at 4 KiB, dimensions at 64 pixels per axis, output at 16 KiB, and cumulative
-codec allocations at 256 KiB. The harness does not write files or diagnostics;
-libFuzzer and the sanitizers own process reporting and crash artifacts.
+at 4 KiB, dimensions at 64 pixels per axis, output at 16 KiB, and codec work at
+256 KiB. PNG and JPEG share the same signature/decode entry point; the harness
+does not write files or diagnostics, and libFuzzer plus the sanitizers own
+process reporting and crash artifacts.
 
 ## Fit boundary
 
@@ -60,10 +61,11 @@ reproducible and unchanged.
 
 ## Corpus provenance
 
-`corpus/decode/` is generated from the exact byte arrays used by
-`test/26png-decode/fixtures.hpp`. It contains the minimal valid normalization
-fixtures plus the signature mismatches, truncations, corrupt payload, unknown
-critical chunk, and hostile headers exercised by the unit-test failure matrix.
+`corpus/decode/` is generated from the exact PNG arrays and JPEG base64 fixtures
+used by the unit suites. It contains minimal valid baseline/progressive JPEG and
+PNG normalization inputs plus signature mismatches, truncations, corrupt
+payloads, unsupported variants, unknown critical chunks, and hostile headers
+exercised by the failure matrices.
 
 `corpus/fit/` contains compact hand-specified control streams covering every
 fit policy and filter plus zero dimensions, non-finite and clamped focal

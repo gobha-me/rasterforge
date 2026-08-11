@@ -6,6 +6,7 @@ if (${PROJECT_NAME}_BUILD_LIB)
     fit.cpp
     fit_geometry.cpp
     image.cpp
+    jpeg_decoder.cpp
     png_decoder.cpp
     quality_filter.cpp
   )
@@ -22,5 +23,6 @@ if (${PROJECT_NAME}_BUILD_LIB)
     PRIVATE
       PNG::PNG
       ZLIB::ZLIB
+      JPEGTurbo::JPEG
   )
 endif ()

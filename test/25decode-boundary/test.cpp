@@ -138,6 +138,7 @@ TEST_CASE("decode public metadata types have stable defaults",
   REQUIRE(options.limits == rf::Limits{});
 
   STATIC_REQUIRE(static_cast<std::uint8_t>(rf::ImageFormat::png) == 1);
+  STATIC_REQUIRE(static_cast<std::uint8_t>(rf::ImageFormat::jpeg) == 2);
   STATIC_REQUIRE(static_cast<std::uint8_t>(rf::OrientationStatus::not_present) ==
                  0);
 }

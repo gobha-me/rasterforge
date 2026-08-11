@@ -1,5 +1,12 @@
 #include <png.h>
 
+#include <cstddef>
+#include <cstdio>
+
+extern "C" {
+#include <jpeglib.h>
+}
+
 #ifndef PNG_USER_MEM_SUPPORTED
 #  error "RasterForge requires libpng custom allocator support"
 #endif
@@ -27,6 +34,14 @@ namespace rasterforge::detail {
 
 auto png_dependency_ready() noexcept -> bool {
   return png_access_version_number() == PNG_LIBPNG_VER;
+}
+
+auto jpeg_dependency_ready() noexcept -> bool {
+#ifdef LIBJPEG_TURBO_VERSION_NUMBER
+  return LIBJPEG_TURBO_VERSION_NUMBER >= 2001005;
+#else
+  return false;
+#endif
 }
 
 } // namespace rasterforge::detail

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import re
 import struct
 import sys
@@ -12,11 +13,16 @@ from pathlib import Path
 
 REPOSITORY = Path(__file__).resolve().parents[1]
 FIXTURES = REPOSITORY / "test" / "26png-decode" / "fixtures.hpp"
+JPEG_FIXTURES = REPOSITORY / "test" / "34jpeg-decode" / "fixtures.hpp"
 CORPUS_ROOT = Path(__file__).resolve().parent / "corpus"
 DECODE_CORPUS = CORPUS_ROOT / "decode"
 FIT_CORPUS = CORPUS_ROOT / "fit"
 ARRAY = re.compile(
     r"constexpr\s+std::array<std::uint8_t,\s*\d+>\s+(\w+)\s*\{\{(.*?)\}\};",
+    re.DOTALL,
+)
+BASE64_FIXTURE = re.compile(
+    r"inline\s+constexpr\s+std::string_view\s+(\w+)_base64\s*\{(.*?)\};",
     re.DOTALL,
 )
 
@@ -44,8 +50,24 @@ def load_fixtures() -> dict[str, bytes]:
     return fixtures
 
 
+def load_jpeg_fixtures() -> dict[str, bytes]:
+    source = JPEG_FIXTURES.read_text(encoding="utf-8")
+    fixtures: dict[str, bytes] = {}
+    for name, initializer in BASE64_FIXTURE.findall(source):
+        encoded = "".join(re.findall(r'"([^"]*)"', initializer))
+        fixtures[name] = base64.b64decode(encoded, validate=True)
+    required = {"rgb444", "progressive", "cmyk"}
+    missing = required - fixtures.keys()
+    if missing:
+        raise RuntimeError(
+            f"missing JPEG fixture strings: {', '.join(sorted(missing))}"
+        )
+    return fixtures
+
+
 def expected_decode_corpus() -> dict[str, bytes]:
     fixtures = load_fixtures()
+    jpeg_fixtures = load_jpeg_fixtures()
     signature = fixtures["rgb_png"][:8]
     rgb = fixtures["rgb_png"]
 
@@ -71,6 +93,25 @@ def expected_decode_corpus() -> dict[str, bytes]:
     corrupt = bytearray(rgb)
     corrupt[46] ^= 0x80
     seeds["png-corrupt-idat"] = bytes(corrupt)
+
+    jpeg = jpeg_fixtures["rgb444"]
+    jpeg_corrupt = bytearray(jpeg)
+    scan = jpeg.index(b"\xFF\xDA")
+    scan_header_length = struct.unpack_from(">H", jpeg, scan + 2)[0]
+    entropy = scan + 2 + scan_header_length
+    jpeg_corrupt[entropy : entropy + 2] = b"\xFF\xC0"
+    seeds.update(
+        {
+            "jpeg-signature-prefix": b"\xFF",
+            "jpeg-signature-complete": b"\xFF\xD8",
+            "jpeg-truncated-header": jpeg[:20],
+            "jpeg-truncated-scan": jpeg[:-2],
+            "jpeg-corrupt-entropy": bytes(jpeg_corrupt),
+            "jpeg-baseline.jpg": jpeg,
+            "jpeg-progressive.jpg": jpeg_fixtures["progressive"],
+            "jpeg-unsupported-cmyk.jpg": jpeg_fixtures["cmyk"],
+        }
+    )
 
     zero_width = bytearray(rgb)
     struct.pack_into(">I", zero_width, 16, 0)
