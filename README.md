@@ -97,12 +97,14 @@ allocated. See [ADR 0007](docs/adr/0007-scale-adaptive-triangle-filter.md).
 | --- | --- |
 | PNG | Static RGB, RGBA, grayscale, palette/`tRNS`, 16-bit, and Adam7 decode |
 | JPEG | Baseline/progressive 8-bit grayscale and RGB/YCbCr decode; opaque RGBA output |
-| WebP | `unsupported_format`; tracked for the v0.4 format milestone |
+| WebP | `unsupported_format`; deferred pending demand or a bounded implementation spike |
 
 PNG and JPEG samples are currently treated as sRGB without profile conversion,
 and EXIF orientation is not yet interpreted. These deliberate limitations are
 recorded in [ADR 0003](docs/adr/0003-png-decoder-normalization.md) and
-[ADR 0008](docs/adr/0008-libjpeg-turbo-jpeg-decoding.md).
+[ADR 0008](docs/adr/0008-libjpeg-turbo-jpeg-decoding.md). WebP's reopening
+criteria and the shared animation boundary for GIF, animated WebP, and APNG are
+recorded in [ADR 0009](docs/adr/0009-defer-webp-until-demand-or-capacity.md).
 
 ### Error contract
 
