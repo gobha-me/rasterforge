@@ -7,6 +7,7 @@ if (${PROJECT_NAME}_BUILD_LIB)
     fit_geometry.cpp
     image.cpp
     jpeg_decoder.cpp
+    orientation.cpp
     png_decoder.cpp
     quality_filter.cpp
   )

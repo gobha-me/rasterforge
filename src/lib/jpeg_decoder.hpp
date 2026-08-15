@@ -2,6 +2,8 @@
 
 #include <rasterforge/rasterforge.hpp>
 
+#include "orientation.hpp"
+
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -18,6 +20,7 @@ inline constexpr std::uint64_t jpeg_scanline_row_multiplier{32ULL};
 struct JpegDecodeResult {
   Image image;
   Extent encoded_extent;
+  OrientationMetadata orientation;
 };
 
 [[nodiscard]] auto checked_jpeg_work_bytes(Extent extent) noexcept

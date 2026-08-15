@@ -37,6 +37,7 @@ struct JpegErrors {
   jpeg_error_mgr base{};
   std::jmp_buf jump{};
   JpegFailure failure{JpegFailure::none};
+  OrientationMetadata orientation{};
 };
 
 constexpr Error malformed_data{ErrorCode::malformed_data,
@@ -138,6 +139,50 @@ void jpeg_output_message(j_common_ptr) noexcept {}
   return codec_failure;
 }
 
+[[nodiscard]] auto process_exif_marker(j_decompress_ptr decoder) -> boolean {
+  auto *errors = reinterpret_cast<JpegErrors *>(decoder->err);
+  auto *source = decoder->src;
+  if (source == nullptr || source->bytes_in_buffer < 2U) {
+    errors->failure = JpegFailure::truncated;
+    return FALSE;
+  }
+
+  const auto marker_length =
+      (static_cast<std::size_t>(source->next_input_byte[0]) << 8U) |
+      static_cast<std::size_t>(source->next_input_byte[1]);
+  source->next_input_byte += 2;
+  source->bytes_in_buffer -= 2U;
+  if (marker_length < 2U) {
+    errors->failure = JpegFailure::malformed;
+    return FALSE;
+  }
+
+  const auto payload_size = marker_length - 2U;
+  if (payload_size > source->bytes_in_buffer) {
+    errors->failure = JpegFailure::truncated;
+    return FALSE;
+  }
+
+  constexpr std::array exif_identifier{
+      std::byte{'E'}, std::byte{'x'}, std::byte{'i'},
+      std::byte{'f'}, std::byte{0},   std::byte{0},
+  };
+  const auto payload = std::span<const std::byte>{
+      reinterpret_cast<const std::byte *>(source->next_input_byte),
+      payload_size};
+  if (payload.size() >= exif_identifier.size() &&
+      std::equal(exif_identifier.begin(), exif_identifier.end(),
+                 payload.begin())) {
+    merge_orientation_metadata(
+        errors->orientation,
+        parse_exif_orientation(payload.subspan(exif_identifier.size())));
+  }
+
+  source->next_input_byte += payload_size;
+  source->bytes_in_buffer -= payload_size;
+  return TRUE;
+}
+
 // These call frames contain no non-trivial automatic objects after setjmp.
 // A libjpeg fatal error therefore cannot bypass a C++ lifetime.
 [[nodiscard]] auto create_decompressor(jpeg_decompress_struct *decoder,
@@ -156,8 +201,11 @@ void jpeg_output_message(j_common_ptr) noexcept {}
     return false;
   }
   jpeg_mem_src(decoder, encoded, encoded_size);
+  jpeg_set_marker_processor(decoder, JPEG_APP0 + 1, process_exif_marker);
   if (jpeg_read_header(decoder, TRUE) != JPEG_HEADER_OK) {
-    errors->failure = JpegFailure::malformed;
+    if (errors->failure == JpegFailure::none) {
+      errors->failure = JpegFailure::malformed;
+    }
     return false;
   }
   return true;
@@ -311,6 +359,11 @@ auto decode_jpeg(std::span<const std::byte> encoded,
   if (!layout) {
     return std::unexpected{layout.error()};
   }
+  const auto orientation_layout = validate_orientation_layout(
+      extent, reader.errors()->orientation, options);
+  if (!orientation_layout) {
+    return std::unexpected{orientation_layout.error()};
+  }
   const auto work_bytes = checked_jpeg_work_bytes(extent);
   if (!work_bytes) {
     return std::unexpected{work_bytes.error()};
@@ -350,6 +403,7 @@ auto decode_jpeg(std::span<const std::byte> encoded,
   return JpegDecodeResult{
       .image = std::move(image),
       .encoded_extent = extent,
+      .orientation = reader.errors()->orientation,
   };
 }
 

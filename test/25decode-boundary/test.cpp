@@ -37,6 +37,10 @@ static_assert(std::is_same_v<
               bool>);
 static_assert(std::is_same_v<
               decltype(std::declval<const rf::DecodedImage &>()
+                           .source_orientation()),
+              std::optional<rf::Orientation>>);
+static_assert(std::is_same_v<
+              decltype(std::declval<const rf::DecodedImage &>()
                            .orientation_status()),
               rf::OrientationStatus>);
 
@@ -139,6 +143,11 @@ TEST_CASE("decode public metadata types have stable defaults",
 
   STATIC_REQUIRE(static_cast<std::uint8_t>(rf::ImageFormat::png) == 1);
   STATIC_REQUIRE(static_cast<std::uint8_t>(rf::ImageFormat::jpeg) == 2);
+  STATIC_REQUIRE(static_cast<std::uint8_t>(rf::Orientation::identity) == 1);
+  STATIC_REQUIRE(
+      static_cast<std::uint8_t>(rf::Orientation::rotate_270_clockwise) == 8);
+  STATIC_REQUIRE(
+      static_cast<std::uint8_t>(rf::OrientationStatus::invalid_ignored) == 3);
   STATIC_REQUIRE(static_cast<std::uint8_t>(rf::OrientationStatus::not_present) ==
                  0);
 }

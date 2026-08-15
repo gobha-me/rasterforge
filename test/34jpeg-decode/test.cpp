@@ -173,7 +173,7 @@ TEST_CASE("unsupported JPEG processes have a stable category",
   }
 }
 
-TEST_CASE("JPEG EXIF orientation is not implicitly applied in RF-04a",
+TEST_CASE("JPEG EXIF orientation is exposed and normalized by default",
           "[decode][jpeg][metadata][orientation]") {
   auto encoded = fixtures::decode_base64(fixtures::rgb444_base64);
   constexpr std::array exif_orientation_six{
@@ -196,8 +196,9 @@ TEST_CASE("JPEG EXIF orientation is not implicitly applied in RF-04a",
   const auto result = decode(encoded);
   REQUIRE(result);
   REQUIRE(result->encoded_extent() == rf::Extent{2, 1});
-  REQUIRE(result->output_extent() == rf::Extent{2, 1});
-  REQUIRE(result->orientation_status() == rf::OrientationStatus::not_present);
+  REQUIRE(result->output_extent() == rf::Extent{1, 2});
+  REQUIRE(result->source_orientation() == rf::Orientation::rotate_90_clockwise);
+  REQUIRE(result->orientation_status() == rf::OrientationStatus::applied);
 }
 
 TEST_CASE("JPEG dimensions and every resource class are checked",

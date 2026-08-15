@@ -1,8 +1,9 @@
-# libpng is RasterForge's first production codec. Prefer a system libpng 1.6;
-# otherwise use a pinned static build with only the library and install metadata.
+# Libpng provides PNG decode and bounded eXIf metadata access. Prefer a system
+# libpng with the eXIf API; otherwise use the pinned static build with only the
+# library and install metadata.
 
 if (NOT ${PROJECT_NAME}_FORCE_FETCH_DEPS)
-  find_package(PNG 1.6 QUIET)
+  find_package(PNG 1.6.31 QUIET)
 endif ()
 
 if (NOT TARGET PNG::PNG)
