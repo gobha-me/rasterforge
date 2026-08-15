@@ -69,8 +69,9 @@ need the same media path. It must remain useful without either sister project.
 - Vector graphics, video, typography, or general GPU acceleration.
 - Color-management perfection in v0.1. ICC preservation and conversion should
   be designed explicitly rather than implied by a codec accident.
-- Animated output in v0.1. Animation is a later API because frame timing,
-  disposal, memory limits, and partial decoding change the data model.
+- Animated output in the current single-image API. GIF, animated WebP, and APNG
+  need a later codec-neutral model because frame timing, disposal, memory
+  limits, and partial decoding change the data model.
 
 ## Public data model
 
@@ -175,8 +176,10 @@ retain a codec object or expose a codec-specific handle.
 ### Decode
 
 Start with the static formats needed by actual consumers. PNG and JPEG are the
-minimum useful set; WebP is a likely early addition. Codec selection requires a
-short implementation spike comparing:
+minimum useful set. WebP was evaluated and deferred until consumer demand or a
+bounded implementation spike justifies its dependency cost; see
+[ADR 0009](adr/0009-defer-webp-until-demand-or-capacity.md). Codec selection
+requires a short implementation spike comparing:
 
 - malformed-input behavior and maintenance record;
 - maximum-dimension and allocation hooks;
