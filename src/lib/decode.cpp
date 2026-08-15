@@ -1,6 +1,7 @@
 #include <rasterforge/rasterforge.hpp>
 
 #include "jpeg_decoder.hpp"
+#include "orientation.hpp"
 #include "png_decoder.hpp"
 
 #include <algorithm>
@@ -68,14 +69,44 @@ template <std::size_t Size>
 namespace detail {
 
 struct DecodedImageAccess {
-  [[nodiscard]] static auto create(Image image, ImageFormat format,
-                                   Extent encoded_extent, bool has_alpha,
-                                   OrientationStatus orientation_status)
-      -> DecodedImage {
-    return DecodedImage{std::move(image), format, encoded_extent, has_alpha,
-                        orientation_status};
+  [[nodiscard]] static auto
+  create(Image image, ImageFormat format, Extent encoded_extent, bool has_alpha,
+         std::optional<Orientation> source_orientation,
+         OrientationStatus orientation_status) -> DecodedImage {
+    return DecodedImage{std::move(image),   format,
+                        encoded_extent,     has_alpha,
+                        source_orientation, orientation_status};
   }
 };
+
+[[nodiscard]] auto finish_decode(Image image, ImageFormat format,
+                                 Extent encoded_extent, bool has_alpha,
+                                 const OrientationMetadata &orientation,
+                                 const DecodeOptions &options)
+    -> std::expected<DecodedImage, Error> {
+  auto status = OrientationStatus::not_present;
+  std::optional<Orientation> source_orientation;
+
+  if (orientation.invalid) {
+    status = OrientationStatus::invalid_ignored;
+  } else if (orientation.value) {
+    source_orientation = orientation.value;
+    if (options.orientation == OrientationPolicy::ignore) {
+      status = OrientationStatus::ignored;
+    } else {
+      status = OrientationStatus::applied;
+      auto oriented = apply_orientation(std::move(image), *orientation.value,
+                                        options.limits);
+      if (!oriented) {
+        return std::unexpected{oriented.error()};
+      }
+      image = std::move(*oriented);
+    }
+  }
+
+  return DecodedImageAccess::create(std::move(image), format, encoded_extent,
+                                    has_alpha, source_orientation, status);
+}
 
 } // namespace detail
 
@@ -96,9 +127,9 @@ auto decode(std::span<const std::byte> encoded, const DecodeOptions &options)
     if (!decoded) {
       return std::unexpected{decoded.error()};
     }
-    return detail::DecodedImageAccess::create(
-        std::move(decoded->image), ImageFormat::jpeg, decoded->encoded_extent,
-        false, OrientationStatus::not_present);
+    return detail::finish_decode(std::move(decoded->image), ImageFormat::jpeg,
+                                 decoded->encoded_extent, false,
+                                 decoded->orientation, options);
   }
 
   if (!signature_matches(encoded, png_signature)) {
@@ -114,9 +145,9 @@ auto decode(std::span<const std::byte> encoded, const DecodeOptions &options)
     return std::unexpected{decoded.error()};
   }
 
-  return detail::DecodedImageAccess::create(
-      std::move(decoded->image), ImageFormat::png, decoded->encoded_extent,
-      decoded->has_alpha, OrientationStatus::not_present);
+  return detail::finish_decode(std::move(decoded->image), ImageFormat::png,
+                               decoded->encoded_extent, decoded->has_alpha,
+                               decoded->orientation, options);
 }
 
 } // namespace rasterforge

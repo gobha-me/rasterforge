@@ -4,6 +4,10 @@
 
 #include <png.h>
 
+#ifndef PNG_eXIf_SUPPORTED
+#error "RasterForge requires libpng eXIf metadata support"
+#endif
+
 #include <algorithm>
 #include <array>
 #include <csetjmp>
@@ -40,6 +44,7 @@ struct PngHeader {
   png_size_t row_bytes{};
   int passes{};
   bool has_alpha{};
+  OrientationMetadata orientation{};
 };
 
 constexpr Error malformed_data{ErrorCode::malformed_data,
@@ -246,6 +251,14 @@ private:
 
   png_read_info(png, info);
 
+  png_uint_32 exif_size{};
+  png_bytep exif_data{};
+  if (png_get_eXIf_1(png, info, &exif_size, &exif_data) != 0U) {
+    header->orientation = parse_exif_orientation(std::span<const std::byte>{
+        reinterpret_cast<const std::byte *>(exif_data),
+        static_cast<std::size_t>(exif_size)});
+  }
+
   int bit_depth{};
   int color_type{};
   int interlace_type{};
@@ -346,6 +359,11 @@ auto decode_png(std::span<const std::byte> encoded,
   if (extent != expected_extent->encoded_extent) {
     return std::unexpected{codec_failure};
   }
+  const auto orientation_layout =
+      validate_orientation_layout(extent, header.orientation, options);
+  if (!orientation_layout) {
+    return std::unexpected{orientation_layout.error()};
+  }
   auto image_result =
       Image::create(expected_extent->output_extent, options.limits);
   if (!image_result) {
@@ -373,6 +391,7 @@ auto decode_png(std::span<const std::byte> encoded,
       .image = std::move(image),
       .encoded_extent = extent,
       .has_alpha = header.has_alpha,
+      .orientation = header.orientation,
   };
 }
 

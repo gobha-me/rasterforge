@@ -8,7 +8,8 @@ fit, resize, and compositing; it deliberately does not own filesystems,
 networking, terminal protocols, or application presentation policy.
 
 The current release decodes static PNG and JPEG bytes into checked, tightly
-packed straight-alpha sRGBA images and fits image views to exact extents with
+packed straight-alpha sRGBA images, normalizes EXIF orientation when requested,
+and fits image views to exact extents with
 deterministic nearest-neighbor or alpha-correct triangle filtering. It provides
 borrowing views, structured errors, caller-controlled limits, bounded signature
 detection, and an installable CMake target. See
@@ -19,6 +20,7 @@ detection, and an installable CMake target. See
 - CMake 3.28 or newer
 - GCC 13+ or Clang 19+
 - A C++23 standard library with `std::expected`
+- Libpng 1.6.31+ when using a system package
 
 The library links libpng, zlib, and libjpeg-turbo privately; Catch2 is used only
 when building tests. CMake looks for system packages first and falls back to
@@ -95,14 +97,17 @@ allocated. See [ADR 0007](docs/adr/0007-scale-adaptive-triangle-filter.md).
 
 | Format | Current behavior |
 | --- | --- |
-| PNG | Static RGB, RGBA, grayscale, palette/`tRNS`, 16-bit, and Adam7 decode |
-| JPEG | Baseline/progressive 8-bit grayscale and RGB/YCbCr decode; opaque RGBA output |
+| PNG | Static RGB, RGBA, grayscale, palette/`tRNS`, 16-bit, Adam7, and `eXIf` orientation |
+| JPEG | Baseline/progressive 8-bit grayscale and RGB/YCbCr decode; opaque RGBA output and APP1 orientation |
 | WebP | `unsupported_format`; deferred pending demand or a bounded implementation spike |
 
-PNG and JPEG samples are currently treated as sRGB without profile conversion,
-and EXIF orientation is not yet interpreted. These deliberate limitations are
-recorded in [ADR 0003](docs/adr/0003-png-decoder-normalization.md) and
-[ADR 0008](docs/adr/0008-libjpeg-turbo-jpeg-decoding.md). WebP's reopening
+PNG and JPEG samples are currently treated as sRGB without profile conversion.
+That color limitation is recorded in
+[ADR 0003](docs/adr/0003-png-decoder-normalization.md) and
+[ADR 0008](docs/adr/0008-libjpeg-turbo-jpeg-decoding.md).
+EXIF orientation is exposed generically and normalized by default; malformed
+optional orientation metadata is reported and ignored. See
+[ADR 0010](docs/adr/0010-bounded-exif-orientation.md). WebP's reopening
 criteria and the shared animation boundary for GIF, animated WebP, and APNG are
 recorded in [ADR 0009](docs/adr/0009-defer-webp-until-demand-or-capacity.md).
 
@@ -138,16 +143,19 @@ at its configured limit is accepted. Callers can replace defaults through
 | `max_dimension` | 16,384 | Each encoded and orientation-normalized axis |
 | `max_pixels` | 64 Mi pixels | Pixels in the normalized output extent |
 | `max_output_bytes` | 256 MiB | Final tightly packed RGBA image storage |
-| `max_temporary_bytes` | 64 MiB | Codec working storage or quality-filter coefficients |
+| `max_temporary_bytes` | 64 MiB | Codec work, orientation source storage, or quality-filter coefficients |
 
 The temporary budget excludes the input span and final image, which have their
 own limits. PNG accounts cumulative successful allocation requests; JPEG
 charges checked control/scanline work and caps progressive coefficient storage;
 quality fitting accounts the exact payload of its coefficient vectors. Budget
-exhaustion is `resource_limit`; an allocator returning null within budget is
+exhaustion is `resource_limit`; non-identity orientation also charges the
+codec-native RGBA image while the normalized destination coexists. An
+allocator returning null within budget is
 `allocation_failure`. These codec-specific semantics are recorded in
 [ADR 0004](docs/adr/0004-decode-resource-accounting.md) and
-[ADR 0008](docs/adr/0008-libjpeg-turbo-jpeg-decoding.md).
+[ADR 0008](docs/adr/0008-libjpeg-turbo-jpeg-decoding.md), with orientation's
+phase boundary recorded in [ADR 0010](docs/adr/0010-bounded-exif-orientation.md).
 
 ```cpp
 rasterforge::DecodeOptions options{};

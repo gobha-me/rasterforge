@@ -78,3 +78,10 @@ verified as installed static packages.
 Arithmetic JPEG is rejected even when a system codec could decode it, keeping
 system and fallback behavior aligned. Orientation and color-profile limitations
 remain explicit follow-on work rather than accidental codec behavior.
+
+## Later decision
+
+[ADR 0010](0010-bounded-exif-orientation.md) completes RF-04c with a bounded
+APP1 processor, codec-neutral source orientation, and optional normalization.
+The original RF-04a behavior above remains the historical boundary of this
+decision; color-profile handling is still owned by RF-04d.

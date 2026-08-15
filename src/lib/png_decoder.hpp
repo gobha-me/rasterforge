@@ -2,6 +2,8 @@
 
 #include <rasterforge/rasterforge.hpp>
 
+#include "orientation.hpp"
+
 #include <cstddef>
 #include <expected>
 #include <span>
@@ -12,6 +14,7 @@ struct PngDecodeResult {
   Image image;
   Extent encoded_extent;
   bool has_alpha;
+  OrientationMetadata orientation;
 };
 
 [[nodiscard]] auto decode_png(std::span<const std::byte> encoded,

@@ -49,3 +49,10 @@ Supported PNG inputs produce exact RGBA bytes on GCC and Clang, and independent
 decode contexts can run concurrently. Unknown ancillary metadata is discarded
 instead of retained in codec structures. The explicit color, orientation, and
 aggregate-budget limitations must remain visible until their owner issues land.
+
+## Later decision
+
+[ADR 0010](0010-bounded-exif-orientation.md) completes RF-04c by reading PNG
+`eXIf` metadata into a generic orientation value and optionally normalizing the
+decoded pixels. The original RF-02c behavior above remains the historical
+boundary of this decision.

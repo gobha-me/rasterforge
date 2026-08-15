@@ -128,10 +128,21 @@ struct Limits {
 
 enum class ImageFormat : std::uint8_t { png = 1, jpeg = 2 };
 enum class OrientationPolicy : std::uint8_t { apply, ignore };
+enum class Orientation : std::uint8_t {
+  identity = 1,
+  mirror_horizontal = 2,
+  rotate_180 = 3,
+  mirror_vertical = 4,
+  transpose = 5,
+  rotate_90_clockwise = 6,
+  transverse = 7,
+  rotate_270_clockwise = 8,
+};
 enum class OrientationStatus : std::uint8_t {
   not_present,
   applied,
   ignored,
+  invalid_ignored,
 };
 
 struct DecodeOptions {
@@ -146,6 +157,8 @@ class DecodedImage {
   [[nodiscard]] auto encoded_extent() const noexcept -> Extent;
   [[nodiscard]] auto output_extent() const noexcept -> Extent;
   [[nodiscard]] auto has_alpha() const noexcept -> bool;
+  [[nodiscard]] auto source_orientation() const noexcept
+      -> std::optional<Orientation>;
   [[nodiscard]] auto orientation_status() const noexcept
       -> OrientationStatus;
 };
@@ -193,6 +206,14 @@ predictable error reporting matter more than saving one CMake recipe.
 
 Format detection should inspect a bounded signature. Filename extensions and
 MIME strings may be hints in a higher layer, but never override the bytes.
+
+PNG `eXIf` and JPEG APP1 orientation are parsed into one generic enum. Valid
+metadata is normalized by default or reported without application when the
+caller selects `ignore`. Invalid optional orientation metadata is reported as
+ignored rather than turning safe pixel data into a decode failure. Values 2
+through 8 use exact byte-preserving transforms; the codec-native source image
+is charged to the temporary budget while the normalized destination coexists.
+See [ADR 0010](adr/0010-bounded-exif-orientation.md).
 
 ### Resize and fit
 

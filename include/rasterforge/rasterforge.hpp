@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <optional>
 #include <span>
 #include <string_view>
 #include <utility>
@@ -83,8 +84,9 @@ struct Limits {
   std::uint64_t max_output_bytes{256ULL * 1024ULL * 1024ULL};
   std::uint32_t max_dimension{16'384U};
   // Operation-owned temporary storage: cumulative PNG codec requests, bounded
-  // JPEG working storage, or coefficient storage during quality fitting. The
-  // encoded input span and final Image storage have separate limits above.
+  // JPEG working storage, a codec-native image during orientation, or
+  // coefficient storage during quality fitting. The encoded input span and
+  // final Image storage have separate limits above.
   std::uint64_t max_temporary_bytes{64ULL * 1024ULL * 1024ULL};
 
   friend constexpr auto operator==(const Limits &, const Limits &)
@@ -106,10 +108,24 @@ enum class OrientationPolicy : std::uint8_t {
   ignore = 1,
 };
 
+// The transform encoded by EXIF orientation metadata. Values intentionally
+// match the format-neutral EXIF/TIFF representation.
+enum class Orientation : std::uint8_t {
+  identity = 1,
+  mirror_horizontal = 2,
+  rotate_180 = 3,
+  mirror_vertical = 4,
+  transpose = 5,
+  rotate_90_clockwise = 6,
+  transverse = 7,
+  rotate_270_clockwise = 8,
+};
+
 enum class OrientationStatus : std::uint8_t {
   not_present = 0,
   applied = 1,
   ignored = 2,
+  invalid_ignored = 3,
 };
 
 struct DecodeOptions {
@@ -235,6 +251,10 @@ public:
     return image_.extent();
   }
   [[nodiscard]] auto has_alpha() const noexcept -> bool { return has_alpha_; }
+  [[nodiscard]] auto source_orientation() const noexcept
+      -> std::optional<Orientation> {
+    return source_orientation_;
+  }
   [[nodiscard]] auto orientation_status() const noexcept -> OrientationStatus {
     return orientation_status_;
   }
@@ -243,15 +263,18 @@ private:
   friend struct detail::DecodedImageAccess;
 
   DecodedImage(Image image, ImageFormat format, Extent encoded_extent,
-               bool has_alpha, OrientationStatus orientation_status) noexcept
+               bool has_alpha, std::optional<Orientation> source_orientation,
+               OrientationStatus orientation_status) noexcept
       : image_{std::move(image)}, format_{format},
         encoded_extent_{encoded_extent}, has_alpha_{has_alpha},
+        source_orientation_{source_orientation},
         orientation_status_{orientation_status} {}
 
   Image image_;
   ImageFormat format_;
   Extent encoded_extent_{};
   bool has_alpha_{};
+  std::optional<Orientation> source_orientation_{};
   OrientationStatus orientation_status_{OrientationStatus::not_present};
 };
 
