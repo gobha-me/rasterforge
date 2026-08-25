@@ -3,6 +3,7 @@
 #include "jpeg_decoder.hpp"
 #include "orientation.hpp"
 #include "png_decoder.hpp"
+#include "webp_decoder.hpp"
 
 #include <algorithm>
 #include <array>
@@ -22,8 +23,23 @@ constexpr std::array jpeg_signature{
     std::byte{0xD8},
 };
 
-static_assert(png_signature.size() == decode_signature_prefix_bytes);
+constexpr std::array webp_riff_signature{
+    std::byte{'R'},
+    std::byte{'I'},
+    std::byte{'F'},
+    std::byte{'F'},
+};
+constexpr std::array webp_format_signature{
+    std::byte{'W'},
+    std::byte{'E'},
+    std::byte{'B'},
+    std::byte{'P'},
+};
+
+static_assert(png_signature.size() <= decode_signature_prefix_bytes);
 static_assert(jpeg_signature.size() <= decode_signature_prefix_bytes);
+static_assert(webp_format_signature.size() + 8U ==
+              decode_signature_prefix_bytes);
 
 constexpr Error empty_input{ErrorCode::empty_input,
                             "encoded input must not be empty"};
@@ -49,17 +65,46 @@ constexpr Error invalid_orientation{
 }
 
 template <std::size_t Size>
-[[nodiscard]] auto signature_matches(std::span<const std::byte> encoded,
-                                     const std::array<std::byte, Size> &signature)
-    -> bool {
+[[nodiscard]] auto
+signature_matches(std::span<const std::byte> encoded,
+                  const std::array<std::byte, Size> &signature) -> bool {
   return encoded.size() >= signature.size() &&
          std::equal(signature.begin(), signature.end(), encoded.begin());
 }
 
+[[nodiscard]] auto webp_signature_matches(std::span<const std::byte> encoded)
+    -> bool {
+  return encoded.size() >= decode_signature_prefix_bytes &&
+         std::equal(webp_riff_signature.begin(), webp_riff_signature.end(),
+                    encoded.begin()) &&
+         std::equal(webp_format_signature.begin(), webp_format_signature.end(),
+                    encoded.begin() + 8);
+}
+
+[[nodiscard]] auto
+webp_signature_remains_possible(std::span<const std::byte> encoded) -> bool {
+  if (encoded.size() < webp_riff_signature.size()) {
+    return std::equal(encoded.begin(), encoded.end(),
+                      webp_riff_signature.begin());
+  }
+  if (!std::equal(webp_riff_signature.begin(), webp_riff_signature.end(),
+                  encoded.begin())) {
+    return false;
+  }
+  if (encoded.size() <= 8U) {
+    return true;
+  }
+  const auto format_bytes = encoded.subspan(8);
+  return format_bytes.size() < webp_format_signature.size() &&
+         std::equal(format_bytes.begin(), format_bytes.end(),
+                    webp_format_signature.begin());
+}
+
 template <std::size_t Size>
-[[nodiscard]] auto signature_remains_possible(
-    std::span<const std::byte> encoded,
-    const std::array<std::byte, Size> &signature) -> bool {
+[[nodiscard]] auto
+signature_remains_possible(std::span<const std::byte> encoded,
+                           const std::array<std::byte, Size> &signature)
+    -> bool {
   return encoded.size() < signature.size() &&
          std::equal(encoded.begin(), encoded.end(), signature.begin());
 }
@@ -132,9 +177,20 @@ auto decode(std::span<const std::byte> encoded, const DecodeOptions &options)
                                  decoded->orientation, options);
   }
 
+  if (webp_signature_matches(encoded)) {
+    auto decoded = detail::decode_webp(encoded, options);
+    if (!decoded) {
+      return std::unexpected{decoded.error()};
+    }
+    return detail::finish_decode(std::move(decoded->image), ImageFormat::webp,
+                                 decoded->encoded_extent, decoded->has_alpha,
+                                 decoded->orientation, options);
+  }
+
   if (!signature_matches(encoded, png_signature)) {
     if (signature_remains_possible(encoded, png_signature) ||
-        signature_remains_possible(encoded, jpeg_signature)) {
+        signature_remains_possible(encoded, jpeg_signature) ||
+        webp_signature_remains_possible(encoded)) {
       return std::unexpected{truncated_signature};
     }
     return std::unexpected{unsupported_format};

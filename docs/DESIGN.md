@@ -126,7 +126,7 @@ struct Limits {
   std::uint64_t max_temporary_bytes{64_MiB};
 };
 
-enum class ImageFormat : std::uint8_t { png = 1, jpeg = 2 };
+enum class ImageFormat : std::uint8_t { png = 1, jpeg = 2, webp = 3 };
 enum class OrientationPolicy : std::uint8_t { apply, ignore };
 enum class Orientation : std::uint8_t {
   identity = 1,
@@ -188,11 +188,12 @@ retain a codec object or expose a codec-specific handle.
 
 ### Decode
 
-Start with the static formats needed by actual consumers. PNG and JPEG are the
-minimum useful set. WebP was evaluated and deferred until consumer demand or a
-bounded implementation spike justifies its dependency cost; see
-[ADR 0009](adr/0009-defer-webp-until-demand-or-capacity.md). Codec selection
-requires a short implementation spike comparing:
+The static decode set is PNG, JPEG, and WebP. WebP was initially deferred, then
+reopened when an intended consumer established a concrete workload. Its
+decoder-only libwebp integration, bounded RIFF inspection, explicit animation
+rejection, and conservative temporary-memory reserve are recorded in
+[ADR 0011](adr/0011-bounded-static-webp-decoding.md). Codec selection requires
+a short implementation spike comparing:
 
 - malformed-input behavior and maintenance record;
 - maximum-dimension and allocation hooks;
@@ -207,13 +208,14 @@ predictable error reporting matter more than saving one CMake recipe.
 Format detection should inspect a bounded signature. Filename extensions and
 MIME strings may be hints in a higher layer, but never override the bytes.
 
-PNG `eXIf` and JPEG APP1 orientation are parsed into one generic enum. Valid
-metadata is normalized by default or reported without application when the
-caller selects `ignore`. Invalid optional orientation metadata is reported as
-ignored rather than turning safe pixel data into a decode failure. Values 2
-through 8 use exact byte-preserving transforms; the codec-native source image
-is charged to the temporary budget while the normalized destination coexists.
-See [ADR 0010](adr/0010-bounded-exif-orientation.md).
+PNG `eXIf`, JPEG APP1, and WebP `EXIF` orientation are parsed into one generic
+enum. Valid metadata is normalized by default or reported without application
+when the caller selects `ignore`. Invalid optional orientation metadata is
+reported as ignored rather than turning safe pixel data into a decode failure.
+Values 2 through 8 use exact byte-preserving transforms; the codec-native
+source image is charged to the temporary budget while the normalized
+destination coexists. See
+[ADR 0010](adr/0010-bounded-exif-orientation.md).
 
 ### Resize and fit
 
@@ -293,8 +295,8 @@ Before allocating, validate with checked arithmetic:
 - `width * height` fits and is within the pixel limit;
 - `width * sizeof(Rgba8)` fits the stride type;
 - `stride * height` fits and is within the byte limit;
-- cumulative codec allocation requests are included in the temporary budget,
-  even when the codec frees and replaces a buffer during the operation;
+- codec working storage is bounded through allocator accounting or a checked
+  conservative reservation when a codec has no allocator hook;
 - orientation cannot swap dimensions past a limit;
 - a crafted header cannot trigger allocation before the full header is
   validated.

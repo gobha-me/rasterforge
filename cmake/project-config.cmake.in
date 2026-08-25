@@ -59,9 +59,10 @@ endif ()
 # install(EXPORT) cannot resolve it and this package is never produced at all.
 # See the install-visibility note in cmake/deps/catch2.cmake.
 #
-# This project's library links libpng and zlib privately. Because it is a
-# static archive, both still occur in the exported link interface and must be
-# recreated before the Targets file is loaded.
+# This project's library links libpng, zlib, libjpeg-turbo, and libwebp's
+# decoder privately. Because it is a static archive, all still occur in the
+# exported link interface and must be recreated before the Targets file is
+# loaded.
 #
 # Use find_dependency, not find_package: it forwards REQUIRED/QUIET and reports
 # a miss as "package X not found because dependency Y was missing".
@@ -72,6 +73,7 @@ find_dependency(PNG 1.6.31 MODULE REQUIRED)
 block()
   list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}")
   find_dependency(JPEGTurbo 2.1.5 MODULE REQUIRED)
+  find_dependency(WebP 1.3.2 MODULE REQUIRED)
 endblock()
 
 include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Targets.cmake")

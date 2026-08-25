@@ -23,26 +23,24 @@ constexpr std::array png_signature{
 static_assert(!std::is_default_constructible_v<rf::DecodedImage>);
 static_assert(!std::is_copy_constructible_v<rf::DecodedImage>);
 static_assert(std::is_nothrow_move_constructible_v<rf::DecodedImage>);
-static_assert(std::is_same_v<
-              decltype(std::declval<const rf::DecodedImage &>().format()),
-              rf::ImageFormat>);
-static_assert(std::is_same_v<
-              decltype(std::declval<const rf::DecodedImage &>().encoded_extent()),
-              rf::Extent>);
-static_assert(std::is_same_v<
-              decltype(std::declval<const rf::DecodedImage &>().output_extent()),
-              rf::Extent>);
-static_assert(std::is_same_v<
-              decltype(std::declval<const rf::DecodedImage &>().has_alpha()),
-              bool>);
-static_assert(std::is_same_v<
-              decltype(std::declval<const rf::DecodedImage &>()
-                           .source_orientation()),
-              std::optional<rf::Orientation>>);
-static_assert(std::is_same_v<
-              decltype(std::declval<const rf::DecodedImage &>()
-                           .orientation_status()),
-              rf::OrientationStatus>);
+static_assert(
+    std::is_same_v<decltype(std::declval<const rf::DecodedImage &>().format()),
+                   rf::ImageFormat>);
+static_assert(std::is_same_v<decltype(std::declval<const rf::DecodedImage &>()
+                                          .encoded_extent()),
+                             rf::Extent>);
+static_assert(std::is_same_v<decltype(std::declval<const rf::DecodedImage &>()
+                                          .output_extent()),
+                             rf::Extent>);
+static_assert(
+    std::is_same_v<
+        decltype(std::declval<const rf::DecodedImage &>().has_alpha()), bool>);
+static_assert(std::is_same_v<decltype(std::declval<const rf::DecodedImage &>()
+                                          .source_orientation()),
+                             std::optional<rf::Orientation>>);
+static_assert(std::is_same_v<decltype(std::declval<const rf::DecodedImage &>()
+                                          .orientation_status()),
+                             rf::OrientationStatus>);
 
 TEST_CASE("decode rejects empty and oversized inputs before detection",
           "[decode][failure][limits]") {
@@ -94,7 +92,8 @@ TEST_CASE("decode distinguishes truncated PNG signatures from mismatches",
 
 TEST_CASE("decode detection is bounded to the documented signature prefix",
           "[decode][signature]") {
-  STATIC_REQUIRE(rf::decode_signature_prefix_bytes == png_signature.size());
+  STATIC_REQUIRE(rf::decode_signature_prefix_bytes == 12U);
+  STATIC_REQUIRE(rf::decode_signature_prefix_bytes >= png_signature.size());
 
   SECTION("a complete recognized signature reaches the codec boundary") {
     const auto decoded = rf::decode(png_signature);
@@ -143,11 +142,12 @@ TEST_CASE("decode public metadata types have stable defaults",
 
   STATIC_REQUIRE(static_cast<std::uint8_t>(rf::ImageFormat::png) == 1);
   STATIC_REQUIRE(static_cast<std::uint8_t>(rf::ImageFormat::jpeg) == 2);
+  STATIC_REQUIRE(static_cast<std::uint8_t>(rf::ImageFormat::webp) == 3);
   STATIC_REQUIRE(static_cast<std::uint8_t>(rf::Orientation::identity) == 1);
   STATIC_REQUIRE(
       static_cast<std::uint8_t>(rf::Orientation::rotate_270_clockwise) == 8);
   STATIC_REQUIRE(
       static_cast<std::uint8_t>(rf::OrientationStatus::invalid_ignored) == 3);
-  STATIC_REQUIRE(static_cast<std::uint8_t>(rf::OrientationStatus::not_present) ==
-                 0);
+  STATIC_REQUIRE(
+      static_cast<std::uint8_t>(rf::OrientationStatus::not_present) == 0);
 }

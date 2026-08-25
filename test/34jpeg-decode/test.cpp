@@ -67,7 +67,7 @@ TEST_CASE("JPEG signature classification is bounded and codec-neutral",
   const auto mismatch_result = decode(mismatch);
   REQUIRE_FALSE(mismatch_result);
   REQUIRE(mismatch_result.error().code == rf::ErrorCode::unsupported_format);
-  STATIC_REQUIRE(rf::decode_signature_prefix_bytes == 8);
+  STATIC_REQUIRE(rf::decode_signature_prefix_bytes == 12);
 }
 
 TEST_CASE("baseline RGB and grayscale JPEG normalize to opaque RGBA",
