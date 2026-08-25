@@ -103,12 +103,13 @@ allocated. See [ADR 0007](docs/adr/0007-scale-adaptive-triangle-filter.md).
 | JPEG | Baseline/progressive 8-bit grayscale and RGB/YCbCr decode; opaque RGBA output and APP1 orientation |
 | WebP | Static lossy and lossless decode, straight alpha, and EXIF orientation; animation is rejected |
 
-PNG, JPEG, and WebP samples are currently treated as sRGB without profile
-conversion; embedded ICC profiles and WebP XMP are ignored. That color
-limitation is recorded in
-[ADR 0003](docs/adr/0003-png-decoder-normalization.md) and
-[ADR 0008](docs/adr/0008-libjpeg-turbo-jpeg-decoding.md), with WebP's codec,
-metadata, animation, and resource decisions in
+PNG, JPEG, and WebP sample values are interpreted as sRGB whether color
+metadata is missing or present. RasterForge does not validate, convert,
+preserve, or expose ICC profiles, PNG gamma/chromaticity records, or WebP XMP;
+the maximum retained color metadata is zero bytes. This is a working-space
+interpretation, not a color-management promise. See
+[ADR 0012](docs/adr/0012-ignore-color-metadata.md). WebP's codec, animation,
+and resource decisions remain recorded in
 [ADR 0011](docs/adr/0011-bounded-static-webp-decoding.md).
 EXIF orientation is exposed generically and normalized by default; malformed
 optional orientation metadata is reported and ignored. See
