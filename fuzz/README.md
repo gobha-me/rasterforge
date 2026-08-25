@@ -11,9 +11,11 @@ consuming projects because `rasterforge_FUZZERS` follows
 The `rasterforge-decode-fuzzer` target feeds arbitrary caller-owned byte spans
 through the public `decode()` boundary. Its deliberately small limits cap input
 at 4 KiB, dimensions at 64 pixels per axis, output at 16 KiB, and codec work at
-2 MiB. PNG, JPEG, and WebP share the same signature/decode entry point; the
-harness does not write files or diagnostics, and libFuzzer plus the sanitizers
-own process reporting and crash artifacts.
+2 MiB. PNG, JPEG, and WebP share the same signature/decode entry point. Every
+input runs with orientation normalization both enabled and disabled so metadata
+parsing, all eight transforms, and the reporting-only path share one bounded
+target. The harness does not write files or diagnostics, and libFuzzer plus the
+sanitizers own process reporting and crash artifacts.
 
 ## Fit boundary
 
@@ -66,7 +68,17 @@ by the unit suites. It contains minimal valid baseline/progressive JPEG, static
 lossy/lossless/alpha WebP, animated WebP rejection, EXIF orientation, and PNG
 normalization inputs plus signature mismatches, truncations, corrupt payloads,
 unsupported variants, unknown critical chunks, and hostile headers exercised
-by the failure matrices.
+by the failure matrices. The metadata frontier includes all eight EXIF values,
+invalid and truncated EXIF records, valid and malformed ICC records for every
+codec, PNG gamma/chromaticity/sRGB records, and combined orientation-plus-color
+containers.
+
+The seed bytes are repository-owned test data generated from explicit one- to
+three-pixel fixtures and Python standard-library framing, compression, and
+checksum routines. No third-party image corpus is copied or redistributed, so
+the seeds use RasterForge's repository license. The source fixture comments
+record the ImageMagick/libjpeg/libwebp tools used to encode the few codec
+payloads that cannot be produced by the standard library alone.
 
 `corpus/fit/` contains compact hand-specified control streams covering every
 fit policy and filter plus zero dimensions, non-finite and clamped focal
