@@ -62,6 +62,17 @@ constexpr Error unsupported_feature{
 constexpr Error codec_failure{ErrorCode::codec_failure,
                               "PNG codec produced an invalid RGBA layout"};
 
+// RasterForge deliberately does not color-manage or retain source metadata.
+// Mark every colorimetry chunk recognized by supported libpng releases as
+// unknown so the existing bounded callback discards its payload without
+// profile decompression or codec-dependent validation. eXIf remains known and
+// available to the orientation path below.
+constexpr std::array<png_byte, 35> ignored_color_chunks{
+    'c', 'H', 'R', 'M', 0,   'g', 'A', 'M', 'A', 0,   'i', 'C',
+    'C', 'P', 0,   's', 'R', 'G', 'B', 0,   'c', 'I', 'C', 'P',
+    0,   'c', 'L', 'L', 'I', 0,   'm', 'D', 'C', 'V', 0,
+};
+
 void set_failure(PngState *state, PngFailure failure) noexcept {
   if (state != nullptr && state->failure == PngFailure::none) {
     state->failure = failure;
@@ -247,6 +258,9 @@ private:
            std::numeric_limits<png_alloc_size_t>::max())}));
   png_set_chunk_malloc_max(png, chunk_limit);
   png_set_keep_unknown_chunks(png, PNG_HANDLE_CHUNK_IF_SAFE, nullptr, 0);
+  png_set_keep_unknown_chunks(
+      png, PNG_HANDLE_CHUNK_NEVER, ignored_color_chunks.data(),
+      static_cast<int>(ignored_color_chunks.size() / 5U));
   png_set_read_user_chunk_fn(png, state, png_unknown_chunk_callback);
 
   png_read_info(png, info);

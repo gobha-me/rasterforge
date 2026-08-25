@@ -68,8 +68,9 @@ need the same media path. It must remain useful without either sister project.
 - Filesystem policy. The core API consumes bytes; a small optional file helper
   may be added only if multiple callers otherwise duplicate it.
 - Vector graphics, video, typography, or general GPU acceleration.
-- Color-management perfection in v0.1. ICC preservation and conversion should
-  be designed explicitly rather than implied by a codec accident.
+- Color-management perfection. Decoded samples are interpreted as sRGB while
+  source profiles and colorimetry metadata are ignored and retained as zero
+  bytes; conversion belongs in a separately designed component if demanded.
 - Animated output in the current single-image API. GIF, animated WebP, and APNG
   need a later codec-neutral model because frame timing, disposal, memory
   limits, and partial decoding change the data model. TermForge's animation
@@ -210,6 +211,13 @@ predictable error reporting matter more than saving one CMake recipe.
 
 Format detection should inspect a bounded signature. Filename extensions and
 MIME strings may be hints in a higher layer, but never override the bytes.
+
+Decoded sample values are interpreted as sRGB when color metadata is absent or
+present. ICC profiles, PNG gamma/chromaticity records, and WebP XMP are not
+validated, converted, preserved, or exposed. Well-framed invalid profile
+payloads are ignored without weakening container and pixel-data validation.
+The complete zero-retention contract is recorded in
+[ADR 0012](adr/0012-ignore-color-metadata.md).
 
 PNG `eXIf`, JPEG APP1, and WebP `EXIF` orientation are parsed into one generic
 enum. Valid metadata is normalized by default or reported without application
