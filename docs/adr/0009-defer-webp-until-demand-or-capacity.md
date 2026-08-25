@@ -69,6 +69,31 @@ RasterForge will not silently decode only the first frame of an animated input.
 Animation should be designed once for the public model rather than introduced
 through a codec-specific shortcut.
 
+## Downstream integration update
+
+TermForge v0.56.0 now provides the presentation half of this boundary. Its
+capability-gated driver API accepts a complete sequence of borrowed raw or PNG
+frames, registers the sequence once, places its resident root, and exposes
+once/loop playback, seek, stop, status, and release operations through an opaque
+handle. Unsupported drivers refuse honestly rather than inventing a
+client-driven fallback. See TermForge's
+[visible-animation release](https://github.com/gobha-me/termforge/releases/tag/v0.56.0).
+
+This materially reduces the integration work for animated GIF, WebP, or APNG,
+but it does not replace RasterForge's missing hostile-input model. RasterForge
+must still validate the complete source, apply codec-specific blend and disposal
+rules, expose timing and source loop metadata, enforce cumulative limits, and
+avoid partial success. Producing same-extent, fully composited straight-alpha
+sRGBA frames would align directly with TermForge's registration contract while
+keeping codecs and terminal semantics in their respective libraries.
+
+Callers retain presentation policy rather than necessarily implementing the
+playback engine themselves. On a capable Kitty path, TermForge can own terminal
+residency and commanded playback. AIForge or another caller still chooses
+fallback behavior and maps source loop counts to TermForge's once/loop controls;
+TermForge reports a client-timeline expected completion, not proof that the
+terminal displayed a frame.
+
 ## Consequences
 
 The supported decode set remains static PNG and JPEG, so RF-04c can add generic

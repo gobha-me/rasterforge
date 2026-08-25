@@ -115,6 +115,11 @@ optional orientation metadata is reported and ignored. See
 [ADR 0010](docs/adr/0010-bounded-exif-orientation.md). The shared animation
 boundary for GIF, animated WebP, and APNG remains recorded in
 [ADR 0009](docs/adr/0009-defer-webp-until-demand-or-capacity.md).
+TermForge v0.56.0 can register, place, and control a pre-baked sequence of
+borrowed raw or encoded frames on terminals that prove Kitty animation support.
+That downstream capability makes a future RasterForge animation decoder easier
+to integrate, but does not change the current rejection contract or move codec,
+disposal, loop-count, and cumulative-limit policy into TermForge.
 
 ### Error contract
 

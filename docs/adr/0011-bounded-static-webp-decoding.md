@@ -39,7 +39,9 @@ are treated as sRGB consistently with the existing codecs.
 Animated WebP is `unsupported_feature`. RasterForge will not return the first
 frame as a successful still decode. A future animation implementation must use
 the codec-neutral frame, timing, disposal, loop, and cumulative-limit model
-defined by ADR 0009.
+defined by ADR 0009. TermForge v0.56.0's registered animation sequences now
+provide a natural optional presentation target for such a model, without
+changing RasterForge's current static-only API or core dependency boundary.
 
 libwebp 1.3.2 is the minimum system version. CMake prefers a system
 `WebP::webpdecoder` target and otherwise builds the official libwebp 1.6.0
@@ -80,3 +82,5 @@ The conservative reserve can reject a decode that libwebp might complete with
 less working memory. This is intentional until upstream exposes measurable
 per-operation allocation. RasterForge also acquires libwebp security and pin
 maintenance and still does not provide profile conversion or animation.
+TermForge's downstream animation support lowers the cost of a future adapter;
+it does not weaken this release's explicit animated-input rejection.

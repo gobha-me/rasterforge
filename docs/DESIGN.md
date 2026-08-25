@@ -38,7 +38,8 @@ RasterForge is the reusable boundary between those concerns:
 - RasterForge: validated decoding, transforms, compositing, and explicit
   resource limits.
 - TermForge: terminal capability detection, cell/pixel layout, Kitty upload,
-  ANSI half-block rendering, and image layering.
+  ANSI half-block rendering, image layering, and capability-gated playback of
+  caller-supplied pre-baked animation frames.
 - AIForge: semantic image slots, themes, permissions, cost policy, cache
   policy, and the choice to expose image tools to a model.
 
@@ -71,7 +72,9 @@ need the same media path. It must remain useful without either sister project.
   be designed explicitly rather than implied by a codec accident.
 - Animated output in the current single-image API. GIF, animated WebP, and APNG
   need a later codec-neutral model because frame timing, disposal, memory
-  limits, and partial decoding change the data model.
+  limits, and partial decoding change the data model. TermForge's animation
+  transport reduces downstream integration work but does not make one still
+  image a valid representation of an animated source.
 
 ## Public data model
 
@@ -361,6 +364,23 @@ visible in its name or documentation.
 If zero-copy exchange later matters, agree on a small view protocol rather
 than making either project's owning image type depend on the other.
 
+TermForge v0.56.0 adds a complete terminal-driven animation path: callers can
+register borrowed raw or PNG frames, place the resident animation root, and
+control once/loop playback, seeking, stopping, and release through an opaque
+handle. The path is gated by `supports_image_animation()` and has no implicit
+fallback on unsupported drivers. See TermForge's
+[visible-animation release](https://github.com/gobha-me/termforge/releases/tag/v0.56.0).
+
+A future RasterForge animation result should fit that boundary without taking
+a TermForge dependency. RasterForge can normalize codec-specific blend and
+disposal operations into same-extent, full-canvas straight-alpha sRGBA frames
+with explicit gaps and source loop metadata. An optional adapter can copy or
+convert those frames into TermForge's `AnimationFrame` sequence. AIForge remains
+responsible for capability fallback and presentation policy, including mapping
+finite source loop counts onto TermForge's once/loop controls. TermForge owns
+terminal residency and commanded playback; RasterForge owns hostile-input
+validation, frame composition, and cumulative decode limits.
+
 ## Test strategy
 
 Write the failure matrix before happy-path fixtures. At minimum:
@@ -424,7 +444,11 @@ suite.
 - Optional PNG encoding target.
 - Explicit bounded cache.
 - Cooperative cancellation.
-- Animation model.
+- Codec-neutral animation model with same-extent composited RGBA frames,
+  explicit frame gaps and loop metadata, cumulative frame/pixel/output/
+  temporary limits, and atomic failure before partial success. Validate an
+  optional TermForge animation adapter without adding TermForge to the core
+  dependency graph.
 - SIMD or GPU acceleration.
 
 ## Decisions the first implementation should record
