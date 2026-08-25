@@ -1,6 +1,6 @@
 # ADR 0009: defer WebP without closing the implementation path
 
-- Status: accepted
+- Status: superseded by [ADR 0011](0011-bounded-static-webp-decoding.md)
 - Date: 2026-08-15
 - Issue: [RF-04b](https://github.com/gobha-me/rasterforge/issues/17)
 
@@ -79,3 +79,8 @@ Deferral leaves some otherwise valid input unsupported. The two reopening
 paths prevent that decision from becoming inertia: measured need can prioritize
 the codec, while spare project capacity can fund it once the resource and
 package contracts are demonstrably sound.
+
+On 2026-08-25, the first reopening condition was met by an AIForge/Venice WebP
+delivery requirement. [ADR 0011](0011-bounded-static-webp-decoding.md) records
+the resulting implementation decision while retaining the animation boundary
+defined here.

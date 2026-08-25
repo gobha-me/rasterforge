@@ -106,7 +106,9 @@ if (TARGET ${PROJECT_NAME}_lib)
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rasterforge
   )
 
-  install(FILES ${PROJECT_SOURCE_DIR}/cmake/FindJPEGTurbo.cmake
+  install(FILES
+    ${PROJECT_SOURCE_DIR}/cmake/FindJPEGTurbo.cmake
+    ${PROJECT_SOURCE_DIR}/cmake/FindWebP.cmake
     DESTINATION ${_cfg_install_dir}
   )
 endif ()

@@ -84,9 +84,10 @@ struct Limits {
   std::uint64_t max_output_bytes{256ULL * 1024ULL * 1024ULL};
   std::uint32_t max_dimension{16'384U};
   // Operation-owned temporary storage: cumulative PNG codec requests, bounded
-  // JPEG working storage, a codec-native image during orientation, or
-  // coefficient storage during quality fitting. The encoded input span and
-  // final Image storage have separate limits above.
+  // JPEG working storage, conservative WebP decoder working storage, a
+  // codec-native image during orientation, or coefficient storage during
+  // quality fitting. The encoded input span and final Image storage have
+  // separate limits above.
   std::uint64_t max_temporary_bytes{64ULL * 1024ULL * 1024ULL};
 
   friend constexpr auto operator==(const Limits &, const Limits &)
@@ -96,11 +97,12 @@ struct Limits {
 // Format detection examines no more than this many leading encoded bytes.
 // Increasing the bound when another format is added is source-compatible, but
 // callers must not assume bytes beyond the current value are inspected.
-inline constexpr std::size_t decode_signature_prefix_bytes{8};
+inline constexpr std::size_t decode_signature_prefix_bytes{12};
 
 enum class ImageFormat : std::uint8_t {
   png = 1,
   jpeg = 2,
+  webp = 3,
 };
 
 enum class OrientationPolicy : std::uint8_t {
@@ -279,9 +281,9 @@ private:
 };
 
 // Decoding is byte-only: filenames, MIME hints, and filesystem access are not
-// part of this boundary. Recognized PNG and JPEG data is normalized to
-// straight-alpha RGBA8; codec state and diagnostics remain private to the
-// implementation.
+// part of this boundary. Recognized static PNG, JPEG, and WebP data is
+// normalized to straight-alpha RGBA8; codec state and diagnostics remain
+// private to the implementation.
 [[nodiscard]] auto decode(std::span<const std::byte> encoded,
                           const DecodeOptions &options = {})
     -> std::expected<DecodedImage, Error>;

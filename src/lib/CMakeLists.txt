@@ -10,6 +10,7 @@ if (${PROJECT_NAME}_BUILD_LIB)
     orientation.cpp
     png_decoder.cpp
     quality_filter.cpp
+    webp_decoder.cpp
   )
   add_library(${PROJECT_NAME}::lib ALIAS ${PROJECT_NAME}_lib)
 
@@ -25,5 +26,6 @@ if (${PROJECT_NAME}_BUILD_LIB)
       PNG::PNG
       ZLIB::ZLIB
       JPEGTurbo::JPEG
+      WebP::webpdecoder
   )
 endif ()

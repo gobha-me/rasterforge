@@ -59,6 +59,7 @@ set(${PROJECT_NAME}_DEPS
   zlib    # Compression backend required by libpng
   png     # Production PNG codec selected by ADR 0001
   jpeg    # JPEG codec with a libjpeg-turbo system/fallback path
+  webp    # Static WebP decoder selected by ADR 0011
   catch2  # Catch2 v3 — test framework (test/)
 )
 
@@ -70,7 +71,7 @@ set(${PROJECT_NAME}_DEPS
 # names from it, never add one. Removing a name that is already gone is a no-op,
 # so a project that prunes the list can leave these alone.
 if (NOT ${PROJECT_NAME}_BUILD_LIB)
-  list(REMOVE_ITEM ${PROJECT_NAME}_DEPS zlib png jpeg)
+  list(REMOVE_ITEM ${PROJECT_NAME}_DEPS zlib png jpeg webp)
 endif ()
 
 if (NOT ${PROJECT_NAME}_TESTS)

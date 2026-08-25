@@ -7,7 +7,7 @@ media into predictable RGBA pixels. It owns decoding, resource limits, image
 fit, resize, and compositing; it deliberately does not own filesystems,
 networking, terminal protocols, or application presentation policy.
 
-The current release decodes static PNG and JPEG bytes into checked, tightly
+RasterForge decodes static PNG, JPEG, and WebP bytes into checked, tightly
 packed straight-alpha sRGBA images, normalizes EXIF orientation when requested,
 and fits image views to exact extents with
 deterministic nearest-neighbor or alpha-correct triangle filtering. It provides
@@ -21,11 +21,13 @@ detection, and an installable CMake target. See
 - GCC 13+ or Clang 19+
 - A C++23 standard library with `std::expected`
 - Libpng 1.6.31+ when using a system package
+- libjpeg-turbo 2.1.5+ when using a system package
+- libwebp 1.3.2+ when using a system package
 
-The library links libpng, zlib, and libjpeg-turbo privately; Catch2 is used only
-when building tests. CMake looks for system packages first and falls back to
-pinned source builds. Set `rasterforge_FORCE_FETCH_DEPS=ON` to exercise the
-pinned path explicitly.
+The library links libpng, zlib, libjpeg-turbo, and libwebp's decoder-only
+library privately; Catch2 is used only when building tests. CMake looks for
+system packages first and falls back to pinned source builds. Set
+`rasterforge_FORCE_FETCH_DEPS=ON` to exercise the pinned path explicitly.
 
 Release source archives retain their tag-derived version without requiring a
 Git checkout. An untagged source snapshot with neither repository nor archive
@@ -44,7 +46,7 @@ cmake --build build-clang --parallel
 ctest --test-dir build-clang --output-on-failure
 ```
 
-Clang/libFuzzer coverage for signature detection, PNG, and JPEG decoding is
+Clang/libFuzzer coverage for signature detection, PNG, JPEG, and WebP decoding is
 available as an explicit, bounded developer target. It is excluded from normal
 builds and CTest; see [the fuzzing guide](fuzz/README.md) for the corpus and
 smoke command.
@@ -99,17 +101,20 @@ allocated. See [ADR 0007](docs/adr/0007-scale-adaptive-triangle-filter.md).
 | --- | --- |
 | PNG | Static RGB, RGBA, grayscale, palette/`tRNS`, 16-bit, Adam7, and `eXIf` orientation |
 | JPEG | Baseline/progressive 8-bit grayscale and RGB/YCbCr decode; opaque RGBA output and APP1 orientation |
-| WebP | `unsupported_format`; deferred pending demand or a bounded implementation spike |
+| WebP | Static lossy and lossless decode, straight alpha, and EXIF orientation; animation is rejected |
 
-PNG and JPEG samples are currently treated as sRGB without profile conversion.
-That color limitation is recorded in
+PNG, JPEG, and WebP samples are currently treated as sRGB without profile
+conversion; embedded ICC profiles and WebP XMP are ignored. That color
+limitation is recorded in
 [ADR 0003](docs/adr/0003-png-decoder-normalization.md) and
-[ADR 0008](docs/adr/0008-libjpeg-turbo-jpeg-decoding.md).
+[ADR 0008](docs/adr/0008-libjpeg-turbo-jpeg-decoding.md), with WebP's codec,
+metadata, animation, and resource decisions in
+[ADR 0011](docs/adr/0011-bounded-static-webp-decoding.md).
 EXIF orientation is exposed generically and normalized by default; malformed
 optional orientation metadata is reported and ignored. See
-[ADR 0010](docs/adr/0010-bounded-exif-orientation.md). WebP's reopening
-criteria and the shared animation boundary for GIF, animated WebP, and APNG are
-recorded in [ADR 0009](docs/adr/0009-defer-webp-until-demand-or-capacity.md).
+[ADR 0010](docs/adr/0010-bounded-exif-orientation.md). The shared animation
+boundary for GIF, animated WebP, and APNG remains recorded in
+[ADR 0009](docs/adr/0009-defer-webp-until-demand-or-capacity.md).
 
 ### Error contract
 
@@ -148,13 +153,15 @@ at its configured limit is accepted. Callers can replace defaults through
 The temporary budget excludes the input span and final image, which have their
 own limits. PNG accounts cumulative successful allocation requests; JPEG
 charges checked control/scanline work and caps progressive coefficient storage;
-quality fitting accounts the exact payload of its coefficient vectors. Budget
-exhaustion is `resource_limit`; non-identity orientation also charges the
-codec-native RGBA image while the normalized destination coexists. An
-allocator returning null within budget is
+WebP reserves `1 MiB + 8 * pixels + 32 * encoded bytes` before output allocation
+because libwebp has no per-operation allocator hook; quality fitting accounts
+the exact payload of its coefficient vectors. Budget exhaustion is
+`resource_limit`; non-identity orientation also charges the codec-native RGBA
+image while the normalized destination coexists. An allocator returning null within budget is
 `allocation_failure`. These codec-specific semantics are recorded in
 [ADR 0004](docs/adr/0004-decode-resource-accounting.md) and
-[ADR 0008](docs/adr/0008-libjpeg-turbo-jpeg-decoding.md), with orientation's
+[ADR 0008](docs/adr/0008-libjpeg-turbo-jpeg-decoding.md),
+[ADR 0011](docs/adr/0011-bounded-static-webp-decoding.md), with orientation's
 phase boundary recorded in [ADR 0010](docs/adr/0010-bounded-exif-orientation.md).
 
 ```cpp
@@ -190,8 +197,8 @@ installed under `lib/cmake/rasterforge/`.
   violations before allocation.
 - Public pixels are row-major 8-bit sRGBA with straight alpha.
 - Malformed data is returned as `std::expected` errors, never process aborts.
-- Keep codec state and libpng/libjpeg-turbo dependencies behind the RasterForge
-  boundary.
+- Keep codec state and libpng/libjpeg-turbo/libwebp dependencies behind the
+  RasterForge boundary.
 - Write adversarial and boundary tests before happy-path smoke checks.
 - Preserve clean consumption through `add_subdirectory`, FetchContent, and
   installed `find_package` packages.

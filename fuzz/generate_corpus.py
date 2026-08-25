@@ -14,6 +14,7 @@ from pathlib import Path
 REPOSITORY = Path(__file__).resolve().parents[1]
 FIXTURES = REPOSITORY / "test" / "26png-decode" / "fixtures.hpp"
 JPEG_FIXTURES = REPOSITORY / "test" / "34jpeg-decode" / "fixtures.hpp"
+WEBP_FIXTURES = REPOSITORY / "test" / "36webp-decode" / "fixtures.hpp"
 CORPUS_ROOT = Path(__file__).resolve().parent / "corpus"
 DECODE_CORPUS = CORPUS_ROOT / "decode"
 FIT_CORPUS = CORPUS_ROOT / "fit"
@@ -23,6 +24,10 @@ ARRAY = re.compile(
 )
 BASE64_FIXTURE = re.compile(
     r"inline\s+constexpr\s+std::string_view\s+(\w+)_base64\s*\{(.*?)\};",
+    re.DOTALL,
+)
+WEBP_VECTOR = re.compile(
+    r"inline\s+const\s+std::vector<std::uint8_t>\s+(\w+)\s*\{(.*?)\};",
     re.DOTALL,
 )
 
@@ -65,9 +70,44 @@ def load_jpeg_fixtures() -> dict[str, bytes]:
     return fixtures
 
 
+def load_webp_fixtures() -> dict[str, bytes]:
+    source = WEBP_FIXTURES.read_text(encoding="utf-8")
+    fixtures: dict[str, bytes] = {}
+    for name, initializer in WEBP_VECTOR.findall(source):
+        fixtures[name] = bytes(
+            int(value) for value in re.findall(r"\b\d+\b", initializer)
+        )
+    required = {"rgba_lossless", "rgb_lossy", "animated"}
+    missing = required - fixtures.keys()
+    if missing:
+        raise RuntimeError(
+            f"missing WebP fixture vectors: {', '.join(sorted(missing))}"
+        )
+    return fixtures
+
+
+def webp_with_exif(simple: bytes) -> bytes:
+    tiff = bytes(
+        [
+            ord("I"), ord("I"), 42, 0, 8, 0, 0, 0, 1, 0, 0x12, 0x01, 3, 0,
+            1, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0,
+        ]
+    )
+    vp8x = (
+        b"VP8X"
+        + struct.pack("<I", 10)
+        + bytes([0x18, 0, 0, 0, 1, 0, 0, 0, 0, 0])
+    )
+    exif = b"EXIF" + struct.pack("<I", len(tiff)) + tiff
+    result = bytearray(b"RIFF\0\0\0\0WEBP" + vp8x + simple[12:] + exif)
+    struct.pack_into("<I", result, 4, len(result) - 8)
+    return bytes(result)
+
+
 def expected_decode_corpus() -> dict[str, bytes]:
     fixtures = load_fixtures()
     jpeg_fixtures = load_jpeg_fixtures()
+    webp_fixtures = load_webp_fixtures()
     signature = fixtures["rgb_png"][:8]
     rgb = fixtures["rgb_png"]
 
@@ -87,6 +127,24 @@ def expected_decode_corpus() -> dict[str, bytes]:
             "png-truncated-ihdr": rgb[:20],
             "png-truncated-idat": rgb[:40],
             "png-truncated-iend": rgb[:-1],
+        }
+    )
+
+    webp = webp_fixtures["rgba_lossless"]
+    webp_corrupt = bytearray(webp)
+    webp_corrupt[20:] = b"\xff" * (len(webp_corrupt) - 20)
+    webp_bad_chunk = bytearray(webp)
+    struct.pack_into("<I", webp_bad_chunk, 16, 0x7FFFFFFF)
+    seeds.update(
+        {
+            "webp-signature-prefix": b"RIFF\x22\x00\x00\x00WEB",
+            "webp-truncated.webp": webp[:-1],
+            "webp-corrupt-payload": bytes(webp_corrupt),
+            "webp-malformed-chunk": bytes(webp_bad_chunk),
+            "webp-lossless-alpha.webp": webp,
+            "webp-lossy.webp": webp_fixtures["rgb_lossy"],
+            "webp-animated.webp": webp_fixtures["animated"],
+            "webp-exif-orientation.webp": webp_with_exif(webp),
         }
     )
 

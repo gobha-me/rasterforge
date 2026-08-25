@@ -1,4 +1,5 @@
 #include <png.h>
+#include <webp/decode.h>
 
 #include <cstddef>
 #include <cstdio>
@@ -42,6 +43,10 @@ auto jpeg_dependency_ready() noexcept -> bool {
 #else
   return false;
 #endif
+}
+
+auto webp_dependency_ready() noexcept -> bool {
+  return WebPGetDecoderVersion() >= 0x010302;
 }
 
 } // namespace rasterforge::detail
