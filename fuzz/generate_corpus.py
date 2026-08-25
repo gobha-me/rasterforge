@@ -8,6 +8,7 @@ import base64
 import re
 import struct
 import sys
+import zlib
 from pathlib import Path
 
 
@@ -86,22 +87,101 @@ def load_webp_fixtures() -> dict[str, bytes]:
     return fixtures
 
 
-def webp_with_exif(simple: bytes) -> bytes:
-    tiff = bytes(
-        [
-            ord("I"), ord("I"), 42, 0, 8, 0, 0, 0, 1, 0, 0x12, 0x01, 3, 0,
-            1, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0,
-        ]
+def tiff_orientation(value: int, little_endian: bool = True) -> bytes:
+    byte_order = "<" if little_endian else ">"
+    tiff = bytearray(26)
+    tiff[:2] = b"II" if little_endian else b"MM"
+    struct.pack_into(f"{byte_order}H", tiff, 2, 42)
+    struct.pack_into(f"{byte_order}I", tiff, 4, 8)
+    struct.pack_into(f"{byte_order}H", tiff, 8, 1)
+    struct.pack_into(f"{byte_order}H", tiff, 10, 0x0112)
+    struct.pack_into(f"{byte_order}H", tiff, 12, 3)
+    struct.pack_into(f"{byte_order}I", tiff, 14, 1)
+    struct.pack_into(f"{byte_order}H", tiff, 18, value)
+    return bytes(tiff)
+
+
+def png_chunk(name: bytes, payload: bytes) -> bytes:
+    framed = name + payload
+    return (
+        struct.pack(">I", len(payload))
+        + framed
+        + struct.pack(">I", zlib.crc32(framed))
     )
-    vp8x = (
-        b"VP8X"
-        + struct.pack("<I", 10)
-        + bytes([0x18, 0, 0, 0, 1, 0, 0, 0, 0, 0])
-    )
-    exif = b"EXIF" + struct.pack("<I", len(tiff)) + tiff
-    result = bytearray(b"RIFF\0\0\0\0WEBP" + vp8x + simple[12:] + exif)
+
+
+def png_with_chunks(simple: bytes, chunks: list[tuple[bytes, bytes]]) -> bytes:
+    offset = 8
+    while offset + 12 <= len(simple):
+        length = struct.unpack_from(">I", simple, offset)[0]
+        if simple[offset + 4 : offset + 8] == b"IDAT":
+            additions = b"".join(
+                png_chunk(name, payload) for name, payload in chunks
+            )
+            return simple[:offset] + additions + simple[offset:]
+        offset += length + 12
+    raise RuntimeError("PNG fixture has no IDAT chunk")
+
+
+def jpeg_marker(marker: int, payload: bytes) -> bytes:
+    length = len(payload) + 2
+    if length > 0xFFFF:
+        raise RuntimeError("JPEG metadata marker is too large")
+    return bytes([0xFF, marker]) + struct.pack(">H", length) + payload
+
+
+def jpeg_with_markers(simple: bytes, markers: list[bytes]) -> bytes:
+    if not simple.startswith(b"\xFF\xD8"):
+        raise RuntimeError("JPEG fixture has no SOI marker")
+    return simple[:2] + b"".join(markers) + simple[2:]
+
+
+def webp_chunk(name: bytes, payload: bytes) -> bytes:
+    padding = b"\0" if len(payload) % 2 else b""
+    return name + struct.pack("<I", len(payload)) + payload + padding
+
+
+def extended_webp(
+    simple: bytes, exif: bytes | None = None, icc: bytes | None = None
+) -> bytes:
+    flags = 0x10
+    if exif is not None:
+        flags |= 0x08
+    if icc is not None:
+        flags |= 0x20
+    vp8x_payload = bytes([flags, 0, 0, 0, 1, 0, 0, 0, 0, 0])
+    body = webp_chunk(b"VP8X", vp8x_payload)
+    if icc is not None:
+        body += webp_chunk(b"ICCP", icc)
+    body += simple[12:]
+    if exif is not None:
+        body += webp_chunk(b"EXIF", exif)
+    result = bytearray(b"RIFF\0\0\0\0WEBP" + body)
     struct.pack_into("<I", result, 4, len(result) - 8)
     return bytes(result)
+
+
+def icc_profile() -> bytes:
+    profile = bytearray(132)
+    struct.pack_into(">I", profile, 0, len(profile))
+    struct.pack_into(">I", profile, 8, 0x04300000)
+    profile[12:16] = b"mntr"
+    profile[16:20] = b"RGB "
+    profile[20:24] = b"XYZ "
+    struct.pack_into(">HHH", profile, 24, 2026, 8, 25)
+    profile[36:40] = b"acsp"
+    struct.pack_into(
+        ">III", profile, 68, 0x0000F6D6, 0x00010000, 0x0000D32D
+    )
+    return bytes(profile)
+
+
+def png_iccp(profile: bytes) -> bytes:
+    return b"RasterForge\0\0" + zlib.compress(profile, level=9)
+
+
+def jpeg_icc(profile: bytes) -> bytes:
+    return b"ICC_PROFILE\0\x01\x01" + profile
 
 
 def expected_decode_corpus() -> dict[str, bytes]:
@@ -144,7 +224,6 @@ def expected_decode_corpus() -> dict[str, bytes]:
             "webp-lossless-alpha.webp": webp,
             "webp-lossy.webp": webp_fixtures["rgb_lossy"],
             "webp-animated.webp": webp_fixtures["animated"],
-            "webp-exif-orientation.webp": webp_with_exif(webp),
         }
     )
 
@@ -168,6 +247,88 @@ def expected_decode_corpus() -> dict[str, bytes]:
             "jpeg-baseline.jpg": jpeg,
             "jpeg-progressive.jpg": jpeg_fixtures["progressive"],
             "jpeg-unsupported-cmyk.jpg": jpeg_fixtures["cmyk"],
+        }
+    )
+
+    for value in range(1, 9):
+        tiff = tiff_orientation(value, little_endian=(value % 2 != 0))
+        seeds[f"png-exif-orientation-{value}.png"] = png_with_chunks(
+            rgb, [(b"eXIf", tiff)]
+        )
+        seeds[f"jpeg-exif-orientation-{value}.jpg"] = jpeg_with_markers(
+            jpeg, [jpeg_marker(0xE1, b"Exif\0\0" + tiff)]
+        )
+        seeds[f"webp-exif-orientation-{value}.webp"] = extended_webp(
+            webp, exif=tiff
+        )
+
+    invalid_tiff = tiff_orientation(9)
+    truncated_tiff = tiff_orientation(6)[:13]
+    for label, tiff in (("invalid", invalid_tiff), ("truncated", truncated_tiff)):
+        seeds[f"png-exif-{label}.png"] = png_with_chunks(
+            rgb, [(b"eXIf", tiff)]
+        )
+        seeds[f"jpeg-exif-{label}.jpg"] = jpeg_with_markers(
+            jpeg, [jpeg_marker(0xE1, b"Exif\0\0" + tiff)]
+        )
+        seeds[f"webp-exif-{label}.webp"] = extended_webp(webp, exif=tiff)
+
+    profile = icc_profile()
+    invalid_profile = b"\x01\x02\x03"
+    png_color_records = [
+        (b"gAMA", struct.pack(">I", 45_455)),
+        (
+            b"cHRM",
+            b"".join(
+                struct.pack(">I", value)
+                for value in (
+                    31_270,
+                    32_900,
+                    64_000,
+                    33_000,
+                    30_000,
+                    60_000,
+                    15_000,
+                    6_000,
+                )
+            ),
+        ),
+        (b"sRGB", b"\0"),
+    ]
+    seeds.update(
+        {
+            "png-color-records.png": png_with_chunks(rgb, png_color_records),
+            "png-icc-profile.png": png_with_chunks(
+                rgb, [(b"iCCP", png_iccp(profile))]
+            ),
+            "png-icc-invalid.png": png_with_chunks(
+                rgb, [(b"iCCP", png_iccp(invalid_profile))]
+            ),
+            "jpeg-icc-profile.jpg": jpeg_with_markers(
+                jpeg, [jpeg_marker(0xE2, jpeg_icc(profile))]
+            ),
+            "jpeg-icc-invalid.jpg": jpeg_with_markers(
+                jpeg, [jpeg_marker(0xE2, jpeg_icc(invalid_profile))]
+            ),
+            "webp-icc-profile.webp": extended_webp(webp, icc=profile),
+            "webp-icc-invalid.webp": extended_webp(webp, icc=invalid_profile),
+            "png-exif-color.png": png_with_chunks(
+                rgb,
+                [
+                    (b"eXIf", tiff_orientation(6)),
+                    (b"iCCP", png_iccp(profile)),
+                ],
+            ),
+            "jpeg-exif-color.jpg": jpeg_with_markers(
+                jpeg,
+                [
+                    jpeg_marker(0xE1, b"Exif\0\0" + tiff_orientation(6)),
+                    jpeg_marker(0xE2, jpeg_icc(profile)),
+                ],
+            ),
+            "webp-exif-color.webp": extended_webp(
+                webp, exif=tiff_orientation(6), icc=profile
+            ),
         }
     )
 

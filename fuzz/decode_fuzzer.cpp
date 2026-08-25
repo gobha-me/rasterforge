@@ -4,8 +4,10 @@
 #include <cstdint>
 #include <span>
 
-extern "C" auto LLVMFuzzerTestOneInput(const std::uint8_t *data,
-                                       std::size_t size) -> int {
+namespace {
+
+void decode_with_policy(std::span<const std::byte> encoded,
+                        rasterforge::OrientationPolicy orientation) {
   constexpr std::uint64_t max_input_bytes{4U * 1024U};
   constexpr std::uint32_t max_dimension{64U};
   constexpr std::uint64_t max_pixels{static_cast<std::uint64_t>(max_dimension) *
@@ -19,8 +21,18 @@ extern "C" auto LLVMFuzzerTestOneInput(const std::uint8_t *data,
       .max_dimension = max_dimension,
       .max_temporary_bytes = 2U * 1024U * 1024U,
   };
+  options.orientation = orientation;
 
-  const auto encoded = std::as_bytes(std::span{data, size});
   [[maybe_unused]] auto decoded = rasterforge::decode(encoded, options);
+}
+
+} // namespace
+
+extern "C" auto LLVMFuzzerTestOneInput(const std::uint8_t *data,
+                                       std::size_t size) -> int {
+  const auto encoded = std::as_bytes(std::span{data, size});
+  decode_with_policy(encoded, rasterforge::OrientationPolicy::apply);
+  decode_with_policy(encoded, rasterforge::OrientationPolicy::ignore);
+
   return 0;
 }
