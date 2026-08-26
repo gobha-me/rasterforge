@@ -9,6 +9,7 @@ if (${PROJECT_NAME}_BUILD_LIB)
     image.cpp
     jpeg_decoder.cpp
     orientation.cpp
+    pixel_transform.cpp
     png_decoder.cpp
     quality_filter.cpp
     webp_decoder.cpp

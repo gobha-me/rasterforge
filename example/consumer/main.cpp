@@ -60,8 +60,28 @@ auto main() -> int {
     return 6;
   }
 
+  const auto tinted = rasterforge::tint(
+      fitted->view(), rasterforge::Rgb8{255, 128, 0}, fit_limits);
+  if (!tinted) {
+    return 7;
+  }
+  const auto dimmed = rasterforge::dim(tinted->view(), 0.5F, fit_limits);
+  if (!dimmed) {
+    return 8;
+  }
+  const auto faded =
+      rasterforge::adjust_opacity(dimmed->view(), 0.5F, fit_limits);
+  if (!faded) {
+    return 9;
+  }
+  const auto transformed_row = faded->view().row(0);
+  if (!transformed_row ||
+      (*transformed_row)[0] != rasterforge::Rgba8{9, 5, 0, 128}) {
+    return 10;
+  }
+
   std::printf("%.*s\n",
               static_cast<int>(rasterforge::version::program_name.size()),
               rasterforge::version::program_name.data());
-  return image->size_bytes() == sizeof(rasterforge::Rgba8) ? 0 : 7;
+  return image->size_bytes() == sizeof(rasterforge::Rgba8) ? 0 : 11;
 }

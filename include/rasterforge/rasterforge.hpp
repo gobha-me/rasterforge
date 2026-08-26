@@ -32,6 +32,18 @@ struct Rgba8 {
 static_assert(sizeof(Rgba8) == 4,
               "RasterForge pixels must be tightly packed RGBA8");
 
+// An 8-bit RGB multiplier for tint operations. Each component scales the
+// corresponding straight-alpha pixel channel from zero through full intensity;
+// alpha is deliberately absent because tinting does not change opacity.
+struct Rgb8 {
+  std::uint8_t r{};
+  std::uint8_t g{};
+  std::uint8_t b{};
+
+  friend constexpr auto operator==(const Rgb8 &, const Rgb8 &)
+      -> bool = default;
+};
+
 enum class Fit : std::uint8_t {
   contain = 0,
   cover = 1,
@@ -305,6 +317,24 @@ private:
                                   const Limits &limits = {})
     -> std::expected<Image, Error>;
 [[nodiscard]] auto composite_over(ImageView source, Rgba8 backdrop,
+                                  const Limits &limits = {})
+    -> std::expected<Image, Error>;
+
+// Multiply straight RGB by an 8-bit per-channel tint while preserving alpha.
+// The result is separately owned and exact integer half-up rounding is used.
+[[nodiscard]] auto tint(ImageView source, Rgb8 multiplier,
+                        const Limits &limits = {})
+    -> std::expected<Image, Error>;
+
+// Multiply straight RGB uniformly while preserving alpha. Finite factors are
+// clamped to [0, 1]; non-finite factors are invalid arguments.
+[[nodiscard]] auto dim(ImageView source, float factor,
+                       const Limits &limits = {})
+    -> std::expected<Image, Error>;
+
+// Multiply alpha while preserving straight RGB, including RGB carried by an
+// alpha-zero pixel. Factor validation and clamping match dim().
+[[nodiscard]] auto adjust_opacity(ImageView source, float factor,
                                   const Limits &limits = {})
     -> std::expected<Image, Error>;
 

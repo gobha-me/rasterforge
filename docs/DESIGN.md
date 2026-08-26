@@ -298,6 +298,17 @@ storage is allocated and charged, with no encoded-input or temporary-memory
 charge. The alpha, color, rounding, limit, exception, and concurrency decisions
 are recorded in [ADR 0013](adr/0013-deterministic-source-over-compositing.md).
 
+The public `tint`, `dim`, and `adjust_opacity` operations are independent,
+out-of-place straight-alpha transforms. Tint multiplies RGB by an `Rgb8` value,
+dim applies one uniform RGB factor, and opacity changes alpha only. Tint and dim
+preserve alpha; opacity preserves RGB even when its result is fully transparent.
+Finite scalar factors clamp to `[0,1]`, while NaN and infinities are invalid.
+Factors are quantized to an 8-bit multiplier and all channel products use exact
+half-up integer rounding. Each call allocates only its final image, so repeated
+RGB transforms may differ by order at rounding boundaries. The scalar, alpha,
+limit, determinism, ordering, exception, and concurrency decisions are recorded
+in [ADR 0014](adr/0014-deterministic-pixel-transforms.md).
+
 ### Encoding
 
 Encoding is optional for the first milestone. A PNG encoder becomes useful
