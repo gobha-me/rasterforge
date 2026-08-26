@@ -103,6 +103,31 @@ auto consume(std::span<const std::byte> encoded_bytes) -> void {
 }
 ```
 
+### Copying into an external RGBA consumer
+
+An external library should use a small adapter at its own boundary instead of
+becoming a RasterForge dependency. The complete
+[consumer example](example/consumer/main.cpp) defines a plain external RGBA8
+view and a `copy_to_external_rgba8` adapter. The destination type is deliberately
+distinct from `rasterforge::Rgba8`: the adapter reads each source row through
+`ImageView::row()` and copies the red, green, blue, and alpha channels by name.
+It never reinterprets storage merely because two pixel types happen to occupy
+four bytes.
+
+The returned external image owns one tightly packed destination allocation of
+`width * height * 4` bytes. Its view reports an explicit `width * 4` byte row
+stride and RGBA channel order. The conversion therefore costs one full-frame
+read, one full-frame write, and one allocation; callers should keep that cost
+visible in the adapter name and avoid repeating it per render pass.
+
+Both APIs also make their lifetime boundary explicit. A RasterForge
+`ImageView` borrows its `Image` or `DecodedImage` and must not outlive that
+owner. After copying, the external image is independent of the RasterForge
+owner, while its external view borrows the copied image and must not outlive or
+be retained across a move of that image. AIForge, TermForge, and other consumers
+can adapt this pattern to their own RGBA view type without adding a bridge
+target or either sister project to RasterForge's dependency graph.
+
 `fit` supports contain, cover, stretch, and no-scale policies. It allocates the
 exact destination through `Image::create`, fills uncovered pixels with the
 caller matte, and samples at pixel centers. Nearest is the default and copies
