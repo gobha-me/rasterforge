@@ -104,6 +104,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=RelWithDebInfo
           -Drasterforge_BUILD_BIN=OFF
           -Drasterforge_TESTS=OFF
+          -Drasterforge_BENCHMARKS=OFF
           -Drasterforge_INSTALL=OFF
           -Drasterforge_FUZZERS=ON
 
@@ -141,7 +142,11 @@ jobs:
         run: |
           set -euo pipefail
           NAME=$(basename "$GITHUB_WORKSPACE")
-          cmake -B build "-D${NAME}_BUILD_LIB=OFF" "-D${NAME}_BUILD_BIN=OFF" "-D${NAME}_TESTS=OFF"
+          cmake -B build \
+            "-D${NAME}_BUILD_LIB=OFF" \
+            "-D${NAME}_BUILD_BIN=OFF" \
+            "-D${NAME}_TESTS=OFF" \
+            "-D${NAME}_BENCHMARKS=OFF"
           cmake --build build --parallel
           cmake --install build --prefix "$PWD/prefix"
 
