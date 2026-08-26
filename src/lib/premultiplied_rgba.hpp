@@ -55,4 +55,47 @@ unpremultiply_srgba(PremultipliedSrgbaProduct pixel) noexcept -> Rgba8 {
   };
 }
 
+// Porter-Duff source-over in the same gamma-encoded sRGB working space as the
+// quality filter. The exact premultiplied numerators are retained until the
+// final straight-alpha conversion, so no intermediate byte quantization can
+// make the result compiler-dependent.
+[[nodiscard]] constexpr auto source_over_srgba(Rgba8 source,
+                                               Rgba8 backdrop) noexcept
+    -> Rgba8 {
+  const auto source_product = premultiply_srgba(source);
+  const auto backdrop_product = premultiply_srgba(backdrop);
+  const auto inverse_source_alpha =
+      255U - static_cast<std::uint32_t>(source_product.alpha);
+  const auto alpha_numerator =
+      (static_cast<std::uint32_t>(source_product.alpha) * 255U) +
+      (static_cast<std::uint32_t>(backdrop_product.alpha) *
+       inverse_source_alpha);
+
+  if (alpha_numerator == 0) {
+    return {0, 0, 0, 0};
+  }
+
+  const auto channel =
+      [alpha_numerator, inverse_source_alpha](
+          std::uint16_t source_times_alpha,
+          std::uint16_t backdrop_times_alpha) constexpr -> std::uint8_t {
+    const auto numerator =
+        (static_cast<std::uint32_t>(source_times_alpha) * 255U) +
+        (static_cast<std::uint32_t>(backdrop_times_alpha) *
+         inverse_source_alpha);
+    return static_cast<std::uint8_t>((numerator + (alpha_numerator / 2U)) /
+                                     alpha_numerator);
+  };
+
+  return {
+      .r = channel(source_product.red_times_alpha,
+                   backdrop_product.red_times_alpha),
+      .g = channel(source_product.green_times_alpha,
+                   backdrop_product.green_times_alpha),
+      .b = channel(source_product.blue_times_alpha,
+                   backdrop_product.blue_times_alpha),
+      .a = static_cast<std::uint8_t>((alpha_numerator + 127U) / 255U),
+  };
+}
+
 } // namespace rasterforge::detail

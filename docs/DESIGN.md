@@ -288,6 +288,16 @@ Prefer composable operations over a `make_terminal_background()` convenience
 function. Panel opacity, contrast checks, and theme semantics belong to
 AIForge/TermForge.
 
+The public `composite_over` operation applies a source view over either a
+same-extent backdrop view or one spatially uniform RGBA backdrop and returns a
+new owning image. Inputs remain read-only and may alias; mismatched image
+extents are invalid. The deterministic scalar oracle uses exact premultiplied
+gamma-encoded sRGBA products and half-up integer rounding before returning to
+straight alpha. A zero-alpha result is transparent black. Only final output
+storage is allocated and charged, with no encoded-input or temporary-memory
+charge. The alpha, color, rounding, limit, exception, and concurrency decisions
+are recorded in [ADR 0013](adr/0013-deterministic-source-over-compositing.md).
+
 ### Encoding
 
 Encoding is optional for the first milestone. A PNG encoder becomes useful
