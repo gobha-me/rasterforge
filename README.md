@@ -58,6 +58,16 @@ copy workloads without registering timing thresholds as correctness tests. See
 commands, metrics, and measurement limitations. Consuming builds leave the
 target disabled by default.
 
+The committed [RF-05d scalar baseline](docs/benchmarks/rf-05d-2026-08-26.md)
+measured the representative 320x180 workload at 1.14 ms for PNG decode,
+0.17 ms for nearest fit, 1.60 ms for triangle fit, 0.34--0.37 ms for
+compositing, and 0.019 ms for the external RGBA copy. A triangle fit, solid
+composite, and external copy total about 1.96 ms against TermForge's 33.33 ms
+frame budget, excluding all downstream work. The visible bridge copy is not a
+dominant cost, and the baseline establishes no consumer bottleneck that
+justifies speculative optimization. The benchmark guide contains the exact
+commands needed to reproduce the result on another recorded machine.
+
 The `rasterforge` executable is intentionally small; it exposes build metadata
 for packaging checks:
 
@@ -66,6 +76,19 @@ for packaging checks:
 ```
 
 ## Use the library
+
+Choose the integration path before decoding. If a downstream API accepts the
+original encoded PNG, JPEG, or WebP bytes unchanged and the caller needs no
+orientation normalization, inspection, fit, pixel transform, compositing, or
+raw-pixel fallback, pass those bytes directly to the downstream API. Do not
+decode merely to encode the same asset again. Byte acquisition, validation
+required by that downstream path, caching, and encoded-buffer lifetime remain
+caller responsibilities.
+
+Use RasterForge when the application needs bounded validated pixels. The usual
+pipeline is decode and normalize orientation, fit to the semantic destination,
+composite or transform as needed, then consume the resulting RGBA view or copy
+it through an adapter owned by the external consumer:
 
 ```cpp
 #include <rasterforge/rasterforge.hpp>

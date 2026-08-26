@@ -373,6 +373,22 @@ algorithm version.
 
 ## Integration rules
 
+### Choosing the integration path
+
+Keep an asset encoded when the downstream API accepts its original PNG, JPEG,
+or WebP bytes unchanged and the application needs no orientation normalization,
+inspection, fit, pixel transform, compositing, or raw-pixel fallback.
+RasterForge does not need to participate in that path. Acquisition, caching,
+encoded-buffer lifetime, and any validation required by the downstream API
+remain caller policy.
+
+Decode when the application needs validated pixels or any RasterForge-owned
+operation. The complete path is encoded byte span to bounded decode and
+orientation normalization, then fit, compositing or independent pixel
+transforms, followed by a borrowed RGBA view or an external adapter copy. Each
+successful operation returns a complete owning image; failures return no partial
+output. Intermediate views borrow their owners and must not outlive them.
+
 ### AIForge and Venice
 
 If Venice returns a PNG and Kitty can consume it unchanged, AIForge should pass
@@ -388,7 +404,10 @@ terminal coordinates directly.
 Keep RasterForge out of TermForge's required dependency graph. An adapter in
 AIForge, or an optional bridge target, converts a RasterForge view into
 TermForge's `Pixel`/`Image` representation. The adapter must make the copy
-visible in its name or documentation.
+visible in its name or documentation. The example adapter performs one tightly
+packed destination allocation, one full-frame read, and one full-frame write.
+The external image owns the copy independently; its view borrows that external
+owner and must not survive the owner or a move of it.
 
 If zero-copy exchange later matters, agree on a small view protocol rather
 than making either project's owning image type depend on the other.
@@ -409,6 +428,22 @@ responsible for capability fallback and presentation policy, including mapping
 finite source loop counts onto TermForge's once/loop controls. TermForge owns
 terminal residency and commanded playback; RasterForge owns hostile-input
 validation, frame composition, and cumulative decode limits.
+
+### Workload evidence and optimization gate
+
+The [RF-05d scalar baseline](benchmarks/rf-05d-2026-08-26.md) records
+reproducible PNG decode, nearest and triangle fit, source-over compositing, and
+external-copy workloads at 1x1, 320x180, and a Venice-derived 768x1024 proxy.
+At 320x180, triangle fit, solid compositing, and the bridge copy total about
+1.96 ms at their medians; the bridge alone measures 18.6 us and one output
+allocation. Triangle cover from 768x1024 to 320x180 measures 7.43 ms, but no
+consumer evidence identifies it as a bottleneck.
+
+These results do not justify SIMD, caching, encoding, cancellation, blur, GPU,
+or animation work. Any such proposal needs a separate issue with a measured
+consumer workload, a target, adversarial acceptance cases, and reproducible
+verification commands. The benchmark harness remains evidence rather than a
+CI timing gate.
 
 ## Test strategy
 
@@ -436,7 +471,7 @@ be deterministic. Otherwise assert invariants and a documented tolerance. A
 single ordinary decode/resize is the final smoke test, not the center of the
 suite.
 
-## Proposed milestones
+## Milestones
 
 ### RF-01: bootstrap and contracts (complete)
 
@@ -445,24 +480,24 @@ suite.
 - Structured `Error` and caller-controlled `Limits` types.
 - Install/consumer verification on GCC and Clang.
 
-### RF-02: first decoder
+### RF-02: first decoder (complete)
 
 - Land one production codec behind the generic decode API.
 - Enforce limits before allocation.
 - Add malformed corpus, fuzz harness, and metadata reporting.
 
-### RF-03: fit pipeline
+### RF-03: fit pipeline (complete)
 
 - Crop, contain, cover, stretch, letterbox, and focal point.
 - Add byte-preserving nearest and alpha-correct quality filtering.
 - Test arithmetic boundaries and transparent-edge behavior.
 
-### RF-04: format coverage and orientation
+### RF-04: format coverage and orientation (complete)
 
 - Add the remaining consumer-driven static formats.
 - Normalize orientation and document color metadata behavior.
 
-### RF-05: compositing and bridge example
+### RF-05: compositing and bridge example (complete)
 
 - Solid/tint/dim/opacity operations.
 - Example adapter to a plain external RGBA view; keep TermForge optional.
@@ -473,6 +508,7 @@ suite.
 - Optional PNG encoding target.
 - Explicit bounded cache.
 - Cooperative cancellation.
+- Optional blur.
 - Codec-neutral animation model with same-extent composited RGBA frames,
   explicit frame gaps and loop metadata, cumulative frame/pixel/output/
   temporary limits, and atomic failure before partial success. Validate an
