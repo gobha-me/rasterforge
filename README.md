@@ -80,6 +80,12 @@ auto consume(std::span<const std::byte> encoded_bytes) -> void {
   if (!fitted) {
     return;
   }
+
+  auto composited = rasterforge::composite_over(
+      fitted->view(), rasterforge::Rgba8{24, 24, 24, 255});
+  if (!composited) {
+    return;
+  }
 }
 ```
 
@@ -96,6 +102,15 @@ from creating fringes; a fully transparent filtered result is canonicalized to
 transparent black. Filtering remains gamma-encoded rather than linear-light.
 Coefficient storage is checked against `max_temporary_bytes` before output is
 allocated. See [ADR 0007](docs/adr/0007-scale-adaptive-triangle-filter.md).
+
+`composite_over` applies a source view over either a same-extent image view or
+one uniform `Rgba8` backdrop and returns a separately owned image. The operation
+uses deterministic Porter-Duff source-over math on exact premultiplied
+gamma-encoded sRGBA products, then converts to straight alpha with half-up
+integer rounding. A zero-alpha result is transparent black; transparent source
+colors cannot leak into the backdrop. Inputs are read-only and may alias, while
+image backdrop extents must match. See
+[ADR 0013](docs/adr/0013-deterministic-source-over-compositing.md).
 
 | Format | Current behavior |
 | --- | --- |
@@ -139,7 +154,7 @@ text and is not an API key. Public operations currently return these categories:
 | `allocation_failure` | Allocation failed without first exhausting a caller limit. |
 | `unsupported_feature` | The format is recognized but uses an unsupported feature. |
 | `codec_failure` | The codec failed without a more specific stable classification. |
-| `invalid_argument` | A public option contains an unrecognized value. |
+| `invalid_argument` | A public option is unrecognized or image arguments are incompatible. |
 | `row_out_of_range` | A requested image-view row is outside the image extent. |
 
 ### Resource limits
@@ -169,6 +184,8 @@ image while the normalized destination coexists. An allocator returning null wit
 [ADR 0008](docs/adr/0008-libjpeg-turbo-jpeg-decoding.md),
 [ADR 0011](docs/adr/0011-bounded-static-webp-decoding.md), with orientation's
 phase boundary recorded in [ADR 0010](docs/adr/0010-bounded-exif-orientation.md).
+Source-over compositing allocates only its final image, so it charges the
+dimension, pixel, and output-byte limits but not the input or temporary limits.
 
 ```cpp
 rasterforge::DecodeOptions options{};

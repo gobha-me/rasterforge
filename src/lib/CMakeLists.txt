@@ -1,6 +1,7 @@
 if (${PROJECT_NAME}_BUILD_LIB)
   add_library(${PROJECT_NAME}_lib STATIC
     codec_probe.cpp
+    composite.cpp
     decode.cpp
     decode_limits.cpp
     fit.cpp

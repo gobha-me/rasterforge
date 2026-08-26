@@ -298,4 +298,14 @@ private:
                        ResizeFilter filter = ResizeFilter::nearest)
     -> std::expected<Image, Error>;
 
+// Composite source over either a same-extent image or a spatially uniform
+// backdrop using deterministic Porter-Duff source-over semantics. The inputs
+// remain borrowed and read-only; the result owns a separately allocated image.
+[[nodiscard]] auto composite_over(ImageView source, ImageView backdrop,
+                                  const Limits &limits = {})
+    -> std::expected<Image, Error>;
+[[nodiscard]] auto composite_over(ImageView source, Rgba8 backdrop,
+                                  const Limits &limits = {})
+    -> std::expected<Image, Error>;
+
 } // namespace rasterforge
