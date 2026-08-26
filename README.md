@@ -51,6 +51,13 @@ available as an explicit, bounded developer target. It is excluded from normal
 builds and CTest; see [the fuzzing guide](fuzz/README.md) for the corpus and
 smoke command.
 
+A top-level build also creates the non-installed `rasterforge-benchmark`
+developer target. It measures scalar decode, fit, compositing, and external RGBA
+copy workloads without registering timing thresholds as correctness tests. See
+[the benchmark guide](benchmark/README.md) for workload provenance, Release
+commands, metrics, and measurement limitations. Consuming builds leave the
+target disabled by default.
+
 The `rasterforge` executable is intentionally small; it exposes build metadata
 for packaging checks:
 
@@ -256,6 +263,7 @@ To install a library-only package:
 ```bash
 cmake -B build-install \
   -Drasterforge_BUILD_BIN=OFF -Drasterforge_TESTS=OFF \
+  -Drasterforge_BENCHMARKS=OFF \
   -DCMAKE_INSTALL_PREFIX=/desired/prefix
 cmake --build build-install --parallel
 cmake --install build-install

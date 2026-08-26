@@ -185,6 +185,7 @@ PREFIX="${WORK}/prefix"
 if cmake -S "${FORK}" -B "${FORK_BUILD}" \
       -DCMAKE_INSTALL_PREFIX="${PREFIX}" \
       "-D${NAME}_BUILD_BIN=OFF" "-D${NAME}_TESTS=OFF" \
+      "-D${NAME}_BENCHMARKS=OFF" \
       -DPUBDEP_URI="file://${FIXTURE}" \
       -DPUBDEP_TAG="${FIXTURE_SHA}" > "${WORK}/A-configure.log" 2>&1
 then

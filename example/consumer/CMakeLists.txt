@@ -79,7 +79,11 @@ endif ()
 # the demo application, the test framework, and the test targets. Each assertion
 # names a specific guard, so a failure points at the line that regressed rather
 # than at "something got bigger".
-foreach (_leak IN ITEMS ${RASTERFORGE_PROJECT_NAME} Catch2 10image-test)
+foreach (_leak IN ITEMS
+    ${RASTERFORGE_PROJECT_NAME}
+    ${RASTERFORGE_PROJECT_NAME}-benchmark
+    Catch2
+    10image-test)
   if (TARGET ${_leak})
     message(FATAL_ERROR
       "${CONSUMER_MODE}: consuming the library also created the target '${_leak}'. "

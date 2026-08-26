@@ -98,7 +98,8 @@ PREFIX="${WORK}/prefix"
 {
   cmake -S "${REPO_ROOT}" -B "${WORK}/build-install" \
     -DCMAKE_INSTALL_PREFIX="${PREFIX}" \
-    "-D${NAME}_BUILD_BIN=OFF" "-D${NAME}_TESTS=OFF"
+    "-D${NAME}_BUILD_BIN=OFF" "-D${NAME}_TESTS=OFF" \
+    "-D${NAME}_BENCHMARKS=OFF"
   cmake --build "${WORK}/build-install" --parallel
   cmake --install "${WORK}/build-install"
 } > "${WORK}/install.log" 2>&1 || {

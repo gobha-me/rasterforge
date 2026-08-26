@@ -126,6 +126,7 @@ execute_process(
           -Drasterforge_BUILD_BIN=OFF
           -Drasterforge_TESTS=OFF
           -Drasterforge_FUZZERS=OFF
+          -Drasterforge_BENCHMARKS=OFF
           -Drasterforge_INSTALL=OFF
   RESULT_VARIABLE _configure_result
   OUTPUT_VARIABLE _configure_output

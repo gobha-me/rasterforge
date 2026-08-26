@@ -35,6 +35,7 @@ cmake -S "${REPO_ROOT}" -B "${BUILD}" \
   "-D${NAME}_BUILD_BIN=OFF" \
   "-D${NAME}_TESTS=OFF" \
   "-D${NAME}_FUZZERS=OFF" \
+  "-D${NAME}_BENCHMARKS=OFF" \
   "-D${NAME}_FORCE_FETCH_DEPS=${FORCE_FETCH}"
 
 if [ "${MODE}" = system ]; then

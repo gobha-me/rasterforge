@@ -46,6 +46,7 @@ option(${PROJECT_NAME}_BUILD_LIB "Build the RasterForge library" ON)
 option(${PROJECT_NAME}_BUILD_BIN "Build the executable in src/bin"    ${PROJECT_IS_TOP_LEVEL})
 option(${PROJECT_NAME}_TESTS     "Build and register the test suite"  ${PROJECT_IS_TOP_LEVEL})
 option(${PROJECT_NAME}_FUZZERS   "Build the Clang/libFuzzer targets"   ${PROJECT_IS_TOP_LEVEL})
+option(${PROJECT_NAME}_BENCHMARKS "Build the developer benchmark harness" ${PROJECT_IS_TOP_LEVEL})
 option(${PROJECT_NAME}_INSTALL   "Generate install / package-config rules" ${PROJECT_IS_TOP_LEVEL})
 option(${PROJECT_NAME}_FORCE_FETCH_DEPS
   "Skip system packages and use RasterForge's pinned dependency fallbacks"
@@ -98,6 +99,17 @@ endif (${PROJECT_NAME}_TESTS)
 # compiler instrumentation through add_subdirectory / FetchContent.
 if (${PROJECT_NAME}_FUZZERS)
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/fuzz)
+endif ()
+
+# Benchmarks are developer evidence, not correctness tests or installable
+# consumer tools. They build by default only for this top-level project and are
+# deliberately absent from CTest.
+if (${PROJECT_NAME}_BENCHMARKS)
+  if (NOT ${PROJECT_NAME}_BUILD_LIB)
+    message(FATAL_ERROR
+      "${PROJECT_NAME}_BENCHMARKS requires ${PROJECT_NAME}_BUILD_LIB=ON")
+  endif ()
+  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/benchmark)
 endif ()
 
 # Install rules, package config and the exported target set. Replaces the
