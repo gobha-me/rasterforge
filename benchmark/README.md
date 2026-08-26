@@ -5,6 +5,9 @@ external-copy costs for RF-05d. It is workload evidence, not a correctness test
 or a performance gate: CTest never registers it, no timing threshold can fail a
 build, and consumers do not build or install it.
 
+The first committed result set is the
+[2026-08-26 RF-05d scalar baseline](../docs/benchmarks/rf-05d-2026-08-26.md).
+
 ## Workload provenance
 
 The harness creates every source and encoded PNG in memory before timing. The
