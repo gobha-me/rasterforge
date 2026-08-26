@@ -86,6 +86,20 @@ auto consume(std::span<const std::byte> encoded_bytes) -> void {
   if (!composited) {
     return;
   }
+
+  auto tinted = rasterforge::tint(
+      composited->view(), rasterforge::Rgb8{255, 224, 192});
+  if (!tinted) {
+    return;
+  }
+  auto dimmed = rasterforge::dim(tinted->view(), 0.75F);
+  if (!dimmed) {
+    return;
+  }
+  auto faded = rasterforge::adjust_opacity(dimmed->view(), 0.9F);
+  if (!faded) {
+    return;
+  }
 }
 ```
 
@@ -111,6 +125,16 @@ integer rounding. A zero-alpha result is transparent black; transparent source
 colors cannot leak into the backdrop. Inputs are read-only and may alias, while
 image backdrop extents must match. See
 [ADR 0013](docs/adr/0013-deterministic-source-over-compositing.md).
+
+`tint`, `dim`, and `adjust_opacity` are separate out-of-place primitives. Tint
+uses an `Rgb8` multiplier and dim uses one uniform factor; both change straight
+RGB while preserving alpha. Opacity changes alpha while preserving RGB,
+including the color bytes of a fully transparent pixel. Finite factors clamp to
+`[0,1]`; NaN and infinities return `invalid_argument`. Factors are quantized to
+an 8-bit scale, then channels use exact half-up integer multiplication. Because
+each operation rounds to an 8-bit image, repeated RGB transforms and operations
+around compositing may be order-dependent. See
+[ADR 0014](docs/adr/0014-deterministic-pixel-transforms.md).
 
 | Format | Current behavior |
 | --- | --- |
@@ -186,6 +210,7 @@ image while the normalized destination coexists. An allocator returning null wit
 phase boundary recorded in [ADR 0010](docs/adr/0010-bounded-exif-orientation.md).
 Source-over compositing allocates only its final image, so it charges the
 dimension, pixel, and output-byte limits but not the input or temporary limits.
+Tint, dim, and opacity use the same final-image-only accounting.
 
 ```cpp
 rasterforge::DecodeOptions options{};
